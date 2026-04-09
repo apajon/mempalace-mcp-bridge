@@ -37,8 +37,8 @@ if [ ! -d "$REPO_ROOT/.git" ]; then
     fail "Not a git repository. Clone the repo properly before running update.sh."
 fi
 
-# Check for uncommitted local changes to tracked files
-if ! git -C "$REPO_ROOT" diff --quiet HEAD 2>/dev/null; then
+# Check for uncommitted local changes to tracked files (staged or unstaged)
+if ! git -C "$REPO_ROOT" diff-index --quiet HEAD 2>/dev/null; then
     warn "You have uncommitted local changes. They will NOT be overwritten."
     warn "Proceeding with git pull (merge/rebase may conflict on modified files)."
 fi
