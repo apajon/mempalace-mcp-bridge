@@ -32,7 +32,9 @@ code .
 #    "What architecture decisions have I documented?"
 ```
 
-That's it. VS Code will auto-start the MemPalace MCP server when Copilot Chat opens.
+That's it. VS Code will auto-start the MemPalace MCP server when Copilot Chat opens. The first time may take a few seconds while VS Code initializes the server.
+
+> **Important:** open the repository root folder in VS Code (`code .` from inside `mempalace-mcp-bridge/`). Opening a subfolder will prevent MCP from loading.
 
 ---
 
@@ -157,6 +159,7 @@ Key points:
 | MCP server not starting | Run `bash verify.sh` to diagnose; check `.vscode/mcp.json` |
 | No results from Copilot | Mine your files: `uv run --directory . mempalace mine <path>` |
 | MCP tools not available | Reload VS Code window; ensure Copilot Chat trusts the server |
+| Copilot answers but ignores MemPalace | Copilot can silently skip MCP tools — explicitly mention memory in your prompt (e.g. "using my notes, …") to force tool use |
 
 ---
 
