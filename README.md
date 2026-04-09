@@ -41,7 +41,7 @@ After setup, open Copilot Chat and try:
 To mine your own notes into memory:
 
 ```bash
-uv run --python .venv/bin/python mempalace mine /path/to/your/project
+uv run --directory . mempalace mine /path/to/your/project
 ```
 
 Then ask Copilot about anything in those files.

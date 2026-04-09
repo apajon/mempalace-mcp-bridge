@@ -64,6 +64,8 @@ cat > "$MCP_CONFIG" <<EOF
   }
 }
 EOF
+# --directory tells uv which project root to use so it picks up the correct
+# .venv and MemPalace data regardless of where VS Code launches the server.
 
 ok "MCP config written to $MCP_CONFIG"
 

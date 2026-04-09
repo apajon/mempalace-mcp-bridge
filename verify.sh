@@ -49,9 +49,9 @@ fi
 # ─── 4. mempalace CLI responds ───────────────────────────────────────────────
 
 if [ -f "$VENV_PYTHON" ]; then
-    if uv run --python "$VENV_PYTHON" mempalace --help &>/dev/null 2>&1; then
+    if uv run --python "$VENV_PYTHON" mempalace --help &>/dev/null; then
         pass "mempalace CLI responds"
-    elif "$REPO_ROOT/.venv/bin/mempalace" --help &>/dev/null 2>&1; then
+    elif "$REPO_ROOT/.venv/bin/mempalace" --help &>/dev/null; then
         pass "mempalace CLI responds"
     else
         fail "mempalace CLI did not respond — check installation"
@@ -84,7 +84,7 @@ fi
 # ─── 7. MCP server starts ────────────────────────────────────────────────────
 
 if [ -f "$VENV_PYTHON" ]; then
-    if timeout 5 uv run --python "$VENV_PYTHON" python -c "import mempalace.mcp_server" 2>/dev/null; then
+    if uv run --python "$VENV_PYTHON" python -c "import mempalace.mcp_server" 2>/dev/null; then
         pass "mempalace.mcp_server module importable"
     else
         fail "mempalace.mcp_server module not importable — check installation"
