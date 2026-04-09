@@ -1,0 +1,52 @@
+name: Update README TOC
+
+on:
+  workflow_dispatch:
+
+  schedule:
+    # Monday at 3:00 AM Montreal time (Eastern Time)
+    # 3:00 AM ET = 07:00 UTC
+    - cron: "0 7 * * 1"
+
+  push:
+    paths:
+      - "README.md"
+
+permissions:
+  contents: write
+
+jobs:
+  update-toc:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check diff size (push only)
+        id: diff
+        if: github.event_name == 'push'
+        run: |
+          CHANGED_LINES=$(git diff HEAD~1 -- README.md | grep -E '^[+-][^+-]' | wc -l)
+          if [ "$CHANGED_LINES" -lt 10 ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Skipping TOC update: README change too small (<10 lines)"
+          fi
+
+      - name: Generate TOC
+        if: steps.diff.outputs.skip != 'true'
+        run: npx --yes doctoc README.md --notitle
+
+      - name: Commit if changed
+        if: steps.diff.outputs.skip != 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet README.md; then
+            echo "No TOC changes to commit"
+            exit 0
+          fi
+          git add README.md
+          git commit -m "docs: update README TOC"
+          git push
