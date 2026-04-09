@@ -1,252 +1,214 @@
-# mempalace-mcp-bridge
+# MemPalace MCP Bridge for VS Code Copilot
 
-A clean, reproducible setup for [MemPalace](https://github.com/milla-jovovich/mempalace) using `uv`, with MCP auto-start integration for VS Code / Copilot-compatible MCP clients.
+Give [MemPalace](https://github.com/milla-jovovich/mempalace) a permanent memory inside VS Code Copilot Chat — in under 2 minutes.
 
-MemPalace is **not a chatbot**. It is a local memory layer: you mine your own files into it, and your MCP-compatible chat client can query that memory during conversations. No API key required.
-
----
-
-## What this repo does
-
-- Documents a clean MemPalace installation using `uv`
-- Provides bootstrap scripts to set up the environment in one command
-- Includes example data to mine and verify the setup
-- Provides ready-to-copy MCP config for VS Code / Copilot MCP clients
-- Covers auto-start mode: no terminal needed to keep the MCP server running
-
-## What this repo does NOT do
-
-- Does not replace your LLM or AI assistant
-- Does not provide a chat UI
-- Does not install GitHub Copilot or any other MCP client on your behalf
-- Does not automatically configure every possible MCP client
-- Does not require Docker or systemd
+MemPalace lets you mine your own files into a local memory store and query that memory from any MCP-compatible client. No cloud, no API key, no Docker.  
+This repo makes the entire setup plug-and-play: one command does everything.
 
 ---
 
-## Prerequisites
+## What this is not
 
-- Linux (tested on Ubuntu 24.04+, Debian, Arch)
-- Python 3.12+ (managed via `uv`)
-- [`uv`](https://docs.astral.sh/uv/) installed (see below)
-- A MCP-compatible client (VS Code with Copilot Chat, or any stdio MCP client)
-
-### Install uv
-
-```bash
-curl -LsSf https://astral.sh/uv/install.sh | sh
-```
-
-Then reload your shell:
-
-```bash
-source ~/.bashrc  # or ~/.zshrc
-```
-
-Verify:
-
-```bash
-uv --version
-```
+- Not a replacement for MemPalace — it is the integration layer that makes MemPalace easy to use
+- Not a generic MCP template — everything here is specific to MemPalace and VS Code Copilot
+- Not a chat UI or AI assistant — just the fastest path from zero to working MemPalace in Copilot
 
 ---
 
 ## Quickstart
 
 ```bash
-# 1. Clone this repo
-git clone https://github.com/yourname/mempalace-mcp-bridge.git
+# 1. Clone
+git clone https://github.com/apajon/mempalace-mcp-bridge.git
 cd mempalace-mcp-bridge
 
-# 2. Bootstrap the environment (installs MemPalace via uv)
-bash scripts/bootstrap.sh
+# 2. Setup everything (installs uv, MemPalace, mines sample data, writes VS Code config)
+bash setup.sh
 
-# 3. Initialize MemPalace in this directory
-bash scripts/init_palace.sh
+# 3. Open this folder in VS Code
+code .
 
-# 4. Mine the sample notes
-bash scripts/mine_sample_data.sh
+# 4. Open Copilot Chat (Ctrl+Alt+I) and ask:
+#    "What architecture decisions have I documented?"
+```
 
-# 5. Copy the MCP config to your client
-#    Edit examples/mcp/vscode.mcp.json (replace /ABSOLUTE/PATH/TO/uv)
-#    then copy to your VS Code workspace .vscode/mcp.json
+That's it. VS Code will auto-start the MemPalace MCP server when Copilot Chat opens. The first time may take a few seconds while VS Code initializes the server.
 
-# 6. Restart your MCP client (reload VS Code window or restart Copilot Chat)
+> **Important:** open the repository root folder in VS Code (`code .` from inside `mempalace-mcp-bridge/`). Opening a subfolder will prevent MCP from loading.
 
-# 7. Ask a question to verify MemPalace is responding
-#    e.g. "What architecture decisions have I documented?"
+---
+
+## Test it in Copilot
+
+After setup, open Copilot Chat and try:
+
+| Prompt | Expected result |
+|--------|-----------------|
+| `What architecture decisions have I documented?` | MemPalace returns decisions from `examples/sample_notes/decisions.md` |
+| `What do I know about ROS2 debugging?` | MemPalace returns notes from `ros2_debug.md` |
+| `Summarize my architecture notes` | MemPalace retrieves and Copilot summarizes `architecture_notes.md` |
+
+To mine your own notes into memory:
+
+```bash
+uv run --directory . mempalace mine /path/to/your/project
+```
+
+Then ask Copilot about anything in those files.
+
+---
+
+## Why this repo exists
+
+The official MemPalace setup requires:
+
+- Manual `uv` installation
+- Running `mempalace init` and `mempalace mine` by hand
+- Writing a JSON MCP config with absolute paths filled in manually
+- Restarting VS Code and hoping the server starts
+
+**This repo removes all of that friction:**
+
+- `uv`-based reproducible environment — no virtualenv juggling
+- `setup.sh` does everything in one shot
+- MCP config is generated automatically with the correct paths
+- `verify.sh` confirms the full stack is working
+
+---
+
+## Verification
+
+```bash
+bash verify.sh
+```
+
+Expected output:
+
+```
+[PASS] uv found: /home/user/.local/bin/uv (uv 0.x.x)
+[PASS] Virtual environment found at .venv/
+[PASS] mempalace package importable
+[PASS] mempalace CLI responds
+[PASS] Sample notes found in examples/sample_notes/ (3 files)
+[PASS] VS Code MCP config present and populated (.vscode/mcp.json)
+[PASS] MCP server starts without error (exact command from .vscode/mcp.json)
+
+ All 7 checks passed — you're ready to use MemPalace in VS Code!
 ```
 
 ---
 
-## Installation
+## Manual MCP server (fallback)
 
-### 1. Install MemPalace via uv
-
-```bash
-uv pip install mempalace
-```
-
-Or use the bootstrap script which handles everything:
+VS Code handles server startup automatically. If you need to test the server manually:
 
 ```bash
-bash scripts/bootstrap.sh
+bash run.sh
 ```
 
-### 2. Initialize MemPalace
-
-```bash
-uv run mempalace init
-```
-
-This creates a local memory store. By default, MemPalace stores data in `~/.mempalace/` or a local path configured at init time.
-
-### 3. Mine your files
-
-```bash
-uv run mempalace mine ./examples/sample_notes/
-```
-
-Check what was indexed:
-
-```bash
-uv run mempalace search "architecture"
-```
+Keep the terminal open while using Copilot Chat. Press `Ctrl+C` to stop.
 
 ---
 
-## MCP Auto-Start Mode
+## How it works
 
-Instead of running the MCP server manually in a terminal, configure your MCP client to launch it automatically via stdio.
-
-The MCP server is launched with:
-
-```bash
-uv run python -m mempalace.mcp_server
+```
+VS Code Copilot Chat
+       │  MCP stdio
+       ▼
+mempalace.mcp_server   ← launched automatically by VS Code via .vscode/mcp.json
+       │
+       ▼
+~/.mempalace/palace    ← local vector store of your mined files
 ```
 
-### VS Code / Copilot Chat MCP config
+`setup.sh` writes `.vscode/mcp.json` with the absolute path to your `uv` binary, so VS Code can start the server without any manual configuration.
 
-Copy `examples/mcp/vscode.mcp.json` to `.vscode/mcp.json` in your workspace and replace the placeholder path:
+---
+
+## MCP config and paths
+
+`.vscode/mcp.json` is generated by `setup.sh`. It contains machine-specific absolute paths and must not be committed:
 
 ```json
 {
   "servers": {
     "mempalace": {
       "type": "stdio",
-      "command": "/ABSOLUTE/PATH/TO/uv",
-      "args": ["run", "python", "-m", "mempalace.mcp_server"]
+      "command": "/home/yourname/.local/bin/uv",
+      "args": ["run", "--directory", "/home/yourname/mempalace-mcp-bridge", "python", "-m", "mempalace.mcp_server"]
     }
   }
 }
 ```
 
-To find the absolute path to `uv`:
+Key points:
 
-```bash
-which uv
-```
-
-When the MCP client starts a session, it will automatically launch the MemPalace server as a subprocess. No terminal needed.
-
-> **Note:** If you close the MCP client (e.g. reload VS Code), the process may stop and will be restarted on the next session. This is expected behavior for stdio MCP servers.
-
-See [docs/mcp_vscode.md](docs/mcp_vscode.md) for full details.
+- `command` — absolute path to your `uv` binary (varies per machine)
+- `--directory` — absolute path to this repo (varies per machine)
+- The file is intentionally listed in `.gitignore`
+- **If you move or rename the repo folder, re-run `bash setup.sh`** to regenerate the config with the correct paths
 
 ---
 
-## Verification
+## Frequent errors
 
-Run the verification script to check that everything is working:
-
-```bash
-bash scripts/verify_install.sh
-```
-
-Expected output:
-
-```
-[PASS] uv found: /home/user/.cargo/bin/uv
-[PASS] mempalace installed
-[PASS] mempalace responds to version check
-[PASS] sample notes found in examples/sample_notes/
-[PASS] All checks passed
-```
+| Error | Fix |
+|-------|-----|
+| `uv: command not found` | Re-run `bash setup.sh` — it installs uv automatically |
+| MCP server not starting | Run `bash verify.sh` to diagnose; check `.vscode/mcp.json` |
+| No results from Copilot | Mine your files: `uv run --directory . mempalace mine <path>` |
+| MCP tools not available | Reload VS Code window; ensure Copilot Chat trusts the server |
+| Copilot answers but ignores MemPalace | Copilot can silently skip MCP tools — explicitly mention memory in your prompt (e.g. "using my notes, …") to force tool use |
 
 ---
 
-## Manual Fallback (MCP server in terminal)
+## Design insight
 
-If auto-start doesn't work with your client, you can launch the server manually:
-
-```bash
-bash scripts/run_manual_mcp.sh
-```
-
-This starts the MCP server in stdio mode. Keep the terminal open while using the chat client.
-
-See [docs/troubleshooting.md](docs/troubleshooting.md) for common issues.
+MCP is a powerful protocol but its developer experience is rough today: JSON config files with hard-coded paths, no standard discovery, and no feedback when something silently fails. This repo is a concrete example of wrapping that friction so that a real tool — MemPalace — works immediately in a real workflow without any manual plumbing.
 
 ---
 
-## Frequent Errors
-
-| Error | Likely cause |
-|---|---|
-| `uv: command not found` | uv not installed or not in PATH |
-| `mempalace: command not found` | bootstrap.sh not run, or venv not active |
-| MCP server not starting | Wrong path to `uv` in MCP config |
-| No results from search | Files not mined yet, or wrong path |
-| MCP tools not available | Client not configured to trust/use the server |
-
----
-
-## Recommended Workflow
-
-1. Run `bootstrap.sh` once per machine
-2. Run `init_palace.sh` once per project/workspace
-3. Run `mine_sample_data.sh` (or your own `mempalace mine` calls) as your notes evolve
-4. Keep MCP config pointing to the right `uv` binary
-5. Let the MCP client auto-start the server — no terminal management needed
-
----
-
-## Repository Structure
+## Repository structure
 
 ```
 .
-├── README.md
-├── .gitignore
-├── .python-version
+├── setup.sh                  # ONE command: full setup + config generation
+├── run.sh                    # Start MCP server manually (fallback)
+├── verify.sh                 # Verify the entire stack
 ├── scripts/
 │   ├── bootstrap.sh          # Install uv + MemPalace
 │   ├── init_palace.sh        # Initialize MemPalace
 │   ├── mine_sample_data.sh   # Mine example notes
-│   ├── run_manual_mcp.sh     # Fallback: run MCP server manually
-│   └── verify_install.sh     # Verify installation
+│   └── run_manual_mcp.sh     # MCP server entry point
+├── examples/
+│   ├── sample_notes/         # Markdown files mined on first setup
+│   └── mcp/
+│       └── vscode.mcp.json   # Template (setup.sh writes the real one)
 ├── docs/
-│   ├── installation.md       # Detailed install guide
-│   ├── mcp_vscode.md         # VS Code MCP integration
+│   ├── mcp_vscode.md         # VS Code MCP integration details
 │   ├── troubleshooting.md    # Common issues
 │   └── architecture.md       # How MemPalace fits in the stack
-├── examples/
-│   ├── sample_notes/         # Markdown files to mine
-│   │   ├── decisions.md
-│   │   ├── ros2_debug.md
-│   │   └── architecture_notes.md
-│   └── mcp/
-│       ├── vscode.mcp.json           # Ready-to-copy MCP config
-│       └── copilot_mcp_example.json  # Generic MCP example
 └── .vscode/
-    └── settings.json
+    ├── settings.json
+    └── mcp.json              # Generated by setup.sh — do not edit manually
 ```
 
 ---
 
-## Further Reading
+## Prerequisites
 
-- [Installation guide](docs/installation.md)
-- [MCP VS Code integration](docs/mcp_vscode.md)
+- Linux (tested on Ubuntu 24.04+, Debian, Arch)
+- `curl` (to install `uv` if missing)
+- VS Code with [GitHub Copilot Chat](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot-chat) extension
+
+`setup.sh` installs `uv` and Python 3.12 automatically if they are missing.
+
+---
+
+## Further reading
+
+- [MCP VS Code integration details](docs/mcp_vscode.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Architecture overview](docs/architecture.md)
-- [MemPalace documentation](https://github.com/milla-jovovich/mempalace)
+- [MemPalace project](https://github.com/milla-jovovich/mempalace)

@@ -1,4 +1,5 @@
 {
+  "_note": "This is a template. setup.sh generates the real .vscode/mcp.json with correct absolute paths automatically.",
   "servers": {
     "mempalace": {
       "type": "stdio",
