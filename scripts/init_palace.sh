@@ -26,15 +26,15 @@ fi
 
 info "Initializing MemPalace..."
 
-# MemPalace stores its data locally (default: ~/.mempalace/ or a path set during init).
-# We run init from the repo root so any relative config picks up the workspace.
+# MemPalace init detects rooms from the project folder structure.
+# Palace storage defaults to ~/.mempalace/palace (or path set via --palace).
 cd "$REPO_ROOT"
-uv run --python "$VENV_PYTHON" mempalace init
+uv run --python "$VENV_PYTHON" mempalace init "$REPO_ROOT"
 
 ok "MemPalace initialized"
 echo ""
-echo "MemPalace memory data is stored in:"
-echo "  ~/.mempalace/    (default location — check mempalace docs for custom paths)"
+echo "MemPalace palace storage is at:"
+echo "  ~/.mempalace/palace    (default — override with --palace flag)"
 echo ""
 echo "Next:"
 echo "  bash scripts/mine_sample_data.sh   # Mine the example notes"
