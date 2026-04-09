@@ -1,4 +1,4 @@
-# setup-mempalace-mcp
+# mempalace-mcp-bridge
 
 A clean, reproducible setup for [MemPalace](https://github.com/thalesgroup/mempalace) using `uv`, with MCP auto-start integration for VS Code / Copilot-compatible MCP clients.
 
@@ -55,8 +55,8 @@ uv --version
 
 ```bash
 # 1. Clone this repo
-git clone https://github.com/yourname/setup-mempalace-mcp.git
-cd setup-mempalace-mcp
+git clone https://github.com/yourname/mempalace-mcp-bridge.git
+cd mempalace-mcp-bridge
 
 # 2. Bootstrap the environment (installs MemPalace via uv)
 bash scripts/bootstrap.sh
