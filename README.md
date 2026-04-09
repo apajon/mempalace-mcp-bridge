@@ -26,8 +26,8 @@ MemPalace is **not a chatbot**. It is a local memory layer: you mine your own fi
 
 ## Prerequisites
 
-- Linux (tested on Ubuntu 22.04+, Debian, Arch)
-- Python 3.11+ (managed via `uv`)
+- Linux (tested on Ubuntu 24.04+, Debian, Arch)
+- Python 3.12+ (managed via `uv`)
 - [`uv`](https://docs.astral.sh/uv/) installed (see below)
 - A MCP-compatible client (VS Code with Copilot Chat, or any stdio MCP client)
 

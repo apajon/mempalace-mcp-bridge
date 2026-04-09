@@ -34,7 +34,7 @@ if [ -d "$VENV_DIR" ]; then
     info "Virtual environment already exists at $VENV_DIR"
 else
     info "Creating virtual environment at $VENV_DIR ..."
-    uv venv "$VENV_DIR" --python 3.11
+    uv venv "$VENV_DIR" --python 3.12
     ok "Virtual environment created"
 fi
 

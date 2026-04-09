@@ -2,7 +2,7 @@
 
 ## System overview
 
-This project is a distributed sensor fusion and navigation stack for a mobile robot platform. It runs on ROS2 Humble on Ubuntu 22.04.
+This project is a distributed sensor fusion and navigation stack for a mobile robot platform. It runs on ROS2 Jazzy on Ubuntu 24.04.
 
 Components:
 

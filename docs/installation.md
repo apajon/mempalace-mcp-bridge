@@ -31,18 +31,18 @@ uv --version
 
 ## 2. Set the Python version
 
-This repository includes a `.python-version` file pinned to `3.11`. `uv` will use this automatically when creating the virtual environment.
+This repository includes a `.python-version` file pinned to `3.12`. `uv` will use this automatically when creating the virtual environment.
 
-Verify `uv` can find Python 3.11:
+Verify `uv` can find Python 3.12:
 
 ```bash
 uv python list
 ```
 
-If Python 3.11 is not listed, install it:
+If Python 3.12 is not listed, install it:
 
 ```bash
-uv python install 3.11
+uv python install 3.12
 ```
 
 ---
@@ -50,7 +50,7 @@ uv python install 3.11
 ## 3. Create the virtual environment
 
 ```bash
-uv venv .venv --python 3.11
+uv venv .venv --python 3.12
 ```
 
 This creates a `.venv/` directory in the current folder. It is excluded from version control via `.gitignore`.
