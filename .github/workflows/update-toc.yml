@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
 
   schedule:
-    # Sunday → Monday night at 3:00 AM Montreal time (Eastern Time)
+    # Monday at 3:00 AM Montreal time (Eastern Time)
     # 3:00 AM ET = 07:00 UTC
     - cron: "0 7 * * 1"
 
@@ -28,7 +28,7 @@ jobs:
         id: diff
         if: github.event_name == 'push'
         run: |
-          CHANGED_LINES=$(git diff HEAD~1 -- README.md | grep -E '^[+-]' | grep -v '^+++' | grep -v '^---' | wc -l)
+          CHANGED_LINES=$(git diff HEAD~1 -- README.md | grep -E '^[+-][^+-]' | wc -l)
           if [ "$CHANGED_LINES" -lt 10 ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "Skipping TOC update: README change too small (<10 lines)"
