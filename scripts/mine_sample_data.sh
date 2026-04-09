@@ -29,18 +29,18 @@ fi
 
 # ─── Mine files ───────────────────────────────────────────────────────────────
 
-info "Mining files from $NOTES_DIR ..."
+info "Mining files from $REPO_ROOT ..."
 
 cd "$REPO_ROOT"
-uv run --python "$VENV_PYTHON" mempalace mine "$NOTES_DIR"
+uv run --python "$VENV_PYTHON" mempalace mine "$REPO_ROOT"
 
 ok "Mining complete"
 echo ""
-echo "Files mined:"
-ls "$NOTES_DIR"/*.md 2>/dev/null | while read -r f; do echo "  - $(basename "$f")"; done
+echo "Sample notes mined from:"
+ls "$NOTES_DIR"/*.md 2>/dev/null | while read -r f; do echo "  - examples/sample_notes/$(basename "$f")"; done
 echo ""
 echo "To verify memory was indexed:"
 echo "  uv run --python $VENV_PYTHON mempalace search \"architecture\""
 echo ""
 echo "To mine your own notes later:"
-echo "  uv run --python $VENV_PYTHON mempalace mine /path/to/your/notes/"
+echo "  uv run --python $VENV_PYTHON mempalace mine /path/to/your/project/"
