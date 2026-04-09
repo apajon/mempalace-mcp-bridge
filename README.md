@@ -98,7 +98,49 @@ Expected output:
 
 ---
 
-## Manual MCP server (fallback)
+## Updating
+
+When MemPalace publishes new releases, or when this repo gets new commits, run:
+
+```bash
+git pull
+bash update.sh
+```
+
+Then reload your VS Code window (`Ctrl+Shift+P` → **Developer: Reload Window**).
+
+### What `update.sh` does
+
+| Action | Notes |
+|--------|-------|
+| `git pull` | Pulls the latest changes from this repo |
+| Upgrades MemPalace in `.venv` | `uv pip install --upgrade mempalace` |
+| Checks `.vscode/mcp.json` paths | Regenerates only if paths are wrong or stale |
+| Runs `verify.sh` | Confirms the full stack is still healthy |
+
+### What `update.sh` does NOT do
+
+- **Never touches `~/.mempalace/palace`** — your notes and memories are always preserved
+- Does not delete or recreate `.venv`
+- Does not overwrite `.vscode/mcp.json` if the paths are still correct
+
+### When to re-run `setup.sh`
+
+Re-run `setup.sh` only if your environment is severely broken (e.g. `.venv` deleted,
+`uv` uninstalled). `setup.sh` is also idempotent — it will skip steps that are
+already complete, including skipping MCP config regeneration if the paths are correct.
+
+### Edge cases
+
+| Situation | What happens |
+|-----------|-------------|
+| Repo moved to a different path | `update.sh` detects the stale path and regenerates `.vscode/mcp.json` |
+| `uv` reinstalled to a different location | Same — stale command path is detected and fixed |
+| `.venv` partially broken | `verify.sh` fails; re-run `bash setup.sh` to repair |
+| MemPalace introduces breaking changes | `verify.sh` reports failures with actionable messages |
+| No internet access | Version staleness check is skipped silently; update still works |
+
+---
 
 VS Code handles server startup automatically. If you need to test the server manually:
 
@@ -174,6 +216,7 @@ MCP is a powerful protocol but its developer experience is rough today: JSON con
 ```
 .
 ├── setup.sh                  # ONE command: full setup + config generation
+├── update.sh                 # Safe update: pull, upgrade, revalidate
 ├── run.sh                    # Start MCP server manually (fallback)
 ├── verify.sh                 # Verify the entire stack
 ├── scripts/

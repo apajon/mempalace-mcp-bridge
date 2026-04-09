@@ -53,7 +53,39 @@ MCP_CONFIG="$VSCODE_DIR/mcp.json"
 
 mkdir -p "$VSCODE_DIR"
 
-cat > "$MCP_CONFIG" <<EOF
+# Only regenerate if the config is missing, has placeholder paths, or the
+# stored paths no longer match this machine (e.g. repo moved, uv reinstalled).
+_needs_regen=true
+if [ -f "$MCP_CONFIG" ] && ! grep -q "ABSOLUTE/PATH" "$MCP_CONFIG" 2>/dev/null; then
+    VENV_PYTHON="$REPO_ROOT/.venv/bin/python"
+    _stored_dir=$("$VENV_PYTHON" -c "
+import json
+try:
+    with open('$MCP_CONFIG') as f:
+        cfg = json.load(f)
+    args = cfg['servers']['mempalace'].get('args', [])
+    idx = args.index('--directory') if '--directory' in args else -1
+    print(args[idx + 1] if idx >= 0 else '')
+except Exception:
+    print('')
+" 2>/dev/null || true)
+    _stored_uv=$("$VENV_PYTHON" -c "
+import json
+try:
+    with open('$MCP_CONFIG') as f:
+        cfg = json.load(f)
+    print(cfg['servers']['mempalace'].get('command', ''))
+except Exception:
+    print('')
+" 2>/dev/null || true)
+
+    if [ "$_stored_dir" = "$REPO_ROOT" ] && [ "$_stored_uv" = "$UV_PATH" ]; then
+        _needs_regen=false
+    fi
+fi
+
+if [ "$_needs_regen" = true ]; then
+    cat > "$MCP_CONFIG" <<EOF
 {
   "servers": {
     "mempalace": {
@@ -64,10 +96,12 @@ cat > "$MCP_CONFIG" <<EOF
   }
 }
 EOF
-# --directory tells uv which project root to use so it picks up the correct
-# .venv and MemPalace data regardless of where VS Code launches the server.
-
-ok "MCP config written to $MCP_CONFIG"
+    # --directory tells uv which project root to use so it picks up the correct
+    # .venv and MemPalace data regardless of where VS Code launches the server.
+    ok "MCP config written to $MCP_CONFIG"
+else
+    ok "MCP config already up to date — not modified ($MCP_CONFIG)"
+fi
 
 # ─── Done ─────────────────────────────────────────────────────────────────────
 
