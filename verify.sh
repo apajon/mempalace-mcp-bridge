@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # verify.sh
 # Verifies the full MemPalace MCP setup: uv, MemPalace, sample data,
-# and VS Code MCP config.
+# VS Code MCP config, and — crucially — that the exact command VS Code will
+# run actually starts without error.
 # Prints a PASS/FAIL summary and exits non-zero if any check fails.
 
 # Note: -e is intentionally omitted. This script must continue running
@@ -81,13 +82,42 @@ else
     fail "VS Code MCP config missing — run: bash setup.sh"
 fi
 
-# ─── 7. MCP server starts ────────────────────────────────────────────────────
+# ─── 7. MCP server actually starts (runs the exact command VS Code will use) ─
+#
+# Parse command + args from .vscode/mcp.json, start the process with stdin
+# held open, wait 2 seconds, verify the process is still running, then kill it.
+# This closes the gap between "env is OK" and "Copilot will actually connect".
 
-if [ -f "$VENV_PYTHON" ]; then
-    if uv run --python "$VENV_PYTHON" python -c "import mempalace.mcp_server" 2>/dev/null; then
-        pass "mempalace.mcp_server module importable"
+if [ -f "$VENV_PYTHON" ] && [ -f "$MCP_CONFIG" ]; then
+    MCP_LAUNCH=$("$VENV_PYTHON" -c "
+import json
+with open('$MCP_CONFIG') as f:
+    cfg = json.load(f)
+srv = cfg['servers']['mempalace']
+print(srv['command'])
+for a in srv.get('args', []):
+    print(a)
+" 2>/dev/null)
+
+    if [ -z "$MCP_LAUNCH" ]; then
+        fail "Could not parse MCP command from $MCP_CONFIG"
     else
-        fail "mempalace.mcp_server module not importable — check installation"
+        readarray -t MCP_PARTS <<< "$MCP_LAUNCH"
+        MCP_COMMAND="${MCP_PARTS[0]}"
+        MCP_ARGS=("${MCP_PARTS[@]:1}")
+
+        # Start server with stdin kept open for 5 s (mirrors how VS Code holds it)
+        "${MCP_COMMAND}" "${MCP_ARGS[@]}" < <(sleep 5) &>/dev/null &
+        SERVER_PID=$!
+        sleep 2
+
+        if kill -0 "$SERVER_PID" 2>/dev/null; then
+            pass "MCP server starts without error (exact command from .vscode/mcp.json)"
+            kill "$SERVER_PID" 2>/dev/null
+            wait "$SERVER_PID" 2>/dev/null || true
+        else
+            fail "MCP server exited immediately — run: bash run.sh to diagnose"
+        fi
     fi
 fi
 
@@ -104,3 +134,4 @@ fi
 echo "════════════════════════════════════════"
 
 [ "$FAIL" -eq 0 ]
+
