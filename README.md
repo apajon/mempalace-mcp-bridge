@@ -1,6 +1,6 @@
 # mempalace-mcp-bridge
 
-A clean, reproducible setup for [MemPalace](https://github.com/thalesgroup/mempalace) using `uv`, with MCP auto-start integration for VS Code / Copilot-compatible MCP clients.
+A clean, reproducible setup for [MemPalace](https://github.com/milla-jovovich/mempalace) using `uv`, with MCP auto-start integration for VS Code / Copilot-compatible MCP clients.
 
 MemPalace is **not a chatbot**. It is a local memory layer: you mine your own files into it, and your MCP-compatible chat client can query that memory during conversations. No API key required.
 
@@ -249,4 +249,4 @@ See [docs/troubleshooting.md](docs/troubleshooting.md) for common issues.
 - [MCP VS Code integration](docs/mcp_vscode.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Architecture overview](docs/architecture.md)
-- [MemPalace documentation](https://github.com/thalesgroup/mempalace)
+- [MemPalace documentation](https://github.com/milla-jovovich/mempalace)
