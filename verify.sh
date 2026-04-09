@@ -121,6 +121,44 @@ for a in srv.get('args', []):
     fi
 fi
 
+# ─── 8. MemPalace version staleness check (best effort, never blocks) ────────
+#
+# Query PyPI for the latest published version and compare it to the locally
+# installed one.  A version mismatch is shown as a warning only — it does not
+# count as a FAIL so that users behind a firewall or without internet are
+# not penalised.
+
+if [ -f "$VENV_PYTHON" ] && "$VENV_PYTHON" -c "import mempalace" 2>/dev/null; then
+    LOCAL_VER=$("$VENV_PYTHON" -c "
+import importlib.metadata, sys
+try:
+    print(importlib.metadata.version('mempalace'))
+except Exception:
+    print('')
+" 2>/dev/null || true)
+
+    if [ -n "$LOCAL_VER" ]; then
+        LATEST_VER=$(curl -fsSL --max-time 5 "https://pypi.org/pypi/mempalace/json" 2>/dev/null \
+            | "$VENV_PYTHON" -c "
+import json, sys
+try:
+    d = json.load(sys.stdin)
+    print(d['info']['version'])
+except Exception:
+    print('')
+" 2>/dev/null || true)
+
+        if [ -n "$LATEST_VER" ] && [ "$LOCAL_VER" != "$LATEST_VER" ]; then
+            echo "[WARN]  Your MemPalace version may be outdated: installed=$LOCAL_VER, latest=$LATEST_VER"
+            echo "        Consider running: bash update.sh"
+        elif [ -n "$LATEST_VER" ]; then
+            pass "MemPalace is up to date (version $LOCAL_VER)"
+        else
+            pass "MemPalace installed (version $LOCAL_VER, could not check for updates)"
+        fi
+    fi
+fi
+
 # ─── Summary ─────────────────────────────────────────────────────────────────
 
 echo ""
