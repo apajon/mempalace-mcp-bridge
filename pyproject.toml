@@ -1,0 +1,9 @@
+[project]
+name = "mempalace-mcp-bridge"
+version = "0.1.0"
+description = "MemPalace MCP bridge for devcontainer integration"
+requires-python = ">=3.12"
+dependencies = [
+    "mempalace>=3.0.0",
+]
+
