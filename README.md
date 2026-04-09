@@ -38,6 +38,32 @@ That's it. VS Code will auto-start the MemPalace MCP server when Copilot Chat op
 
 ---
 
+<details>
+<summary>Table of Contents</summary>
+
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+
+- [Test it in Copilot](#test-it-in-copilot)
+- [Why this repo exists](#why-this-repo-exists)
+- [Verification](#verification)
+- [Updating](#updating)
+  - [What `update.sh` does](#what-updatesh-does)
+  - [What `update.sh` does NOT do](#what-updatesh-does-not-do)
+  - [When to re-run `setup.sh`](#when-to-re-run-setupsh)
+  - [Edge cases](#edge-cases)
+- [How it works](#how-it-works)
+- [MCP config and paths](#mcp-config-and-paths)
+- [Frequent errors](#frequent-errors)
+- [Design insight](#design-insight)
+- [Repository structure](#repository-structure)
+- [Prerequisites](#prerequisites)
+- [Further reading](#further-reading)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
+</details>
+
 ## Test it in Copilot
 
 After setup, open Copilot Chat and try:
