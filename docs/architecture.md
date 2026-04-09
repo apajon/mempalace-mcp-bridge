@@ -1,0 +1,100 @@
+# Architecture Overview
+
+This document explains how MemPalace fits into the local development stack when used with an MCP-compatible chat client.
+
+---
+
+## What MemPalace is (and is not)
+
+**MemPalace is a local memory layer**, not a chatbot and not an LLM.
+
+It:
+- Mines text files (Markdown, code, notes) into a local vector store
+- Exposes a MCP server so that chat clients can query that memory during conversations
+- Runs entirely on your machine — no data leaves your environment
+- Requires no API key
+
+It does not:
+- Replace or augment the LLM itself
+- Provide a chat interface
+- Automatically appear in every chat session — it must be configured as a MCP server
+
+---
+
+## Data flow
+
+```
+Source files (Markdown, code, notes)
+        │
+        ▼
+ mempalace mine <path>
+        │
+        ▼
+Local vector store (~/.mempalace/ or configured path)
+        │
+        ▼
+ python -m mempalace.mcp_server   ◄── launched by MCP client (auto-start)
+        │
+        ▼
+MCP client (VS Code / Copilot Chat / other)
+        │
+        ▼
+ User sends a message in chat
+        │
+        ▼
+ MCP tool call: mempalace.search(query)
+        │
+        ▼
+ Retrieved memory snippets injected into LLM context
+        │
+        ▼
+ LLM produces response enriched with local memory
+```
+
+---
+
+## Components
+
+| Component | Role |
+|---|---|
+| `uv` | Python environment and package manager |
+| `mempalace` CLI | Indexes files into local memory |
+| `mempalace.mcp_server` | Exposes memory as MCP tools |
+| MCP client | Launches the server, sends tool calls |
+| LLM (remote) | Generates responses using memory context |
+
+---
+
+## Auto-start sequence
+
+1. User opens a chat session in the MCP-compatible client
+2. Client reads `.vscode/mcp.json` (or equivalent config)
+3. Client launches `uv run python -m mempalace.mcp_server` as a subprocess
+4. Server starts in stdio mode and waits for MCP protocol messages
+5. When the user asks a question, the client may call `mempalace` tools
+6. Tools return relevant memory chunks
+7. These chunks are included in the LLM prompt
+8. LLM responds with context-aware output
+9. When the session ends, the server process is killed and will be restarted next time
+
+---
+
+## Local data storage
+
+MemPalace stores its indexed data locally. Default location:
+
+```
+~/.mempalace/
+```
+
+The contents are not versioned (excluded by `.gitignore`). If you delete this directory, you need to re-run `mempalace mine`.
+
+---
+
+## Why uv?
+
+`uv` is used instead of `pip` + `venv` because:
+- It creates reproducible environments faster
+- It handles Python version pinning via `.python-version`
+- It supports `uv run` to execute commands inside the environment without activating it
+- It is the recommended approach for isolated Python tooling on Linux developer workstations
