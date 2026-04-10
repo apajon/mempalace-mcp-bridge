@@ -55,6 +55,7 @@ That's it. VS Code will auto-start the MemPalace MCP server when Copilot Chat op
   - [When to re-run `setup.sh`](#when-to-re-run-setupsh)
   - [Edge cases](#edge-cases)
 - [How it works](#how-it-works)
+- [Host as source of truth](#host-as-source-of-truth)
 - [Shared memory across environments](#shared-memory-across-environments)
 - [MCP config and paths](#mcp-config-and-paths)
 - [Frequent errors](#frequent-errors)
@@ -203,6 +204,16 @@ mempalace.mcp_server   ← launched automatically by VS Code via .vscode/mcp.jso
 ```
 
 `setup.sh` writes `.vscode/mcp.json` with the absolute path to your `uv` binary, so VS Code can start the server without any manual configuration.
+
+---
+
+## Host as source of truth
+
+The MemPalace palace (`~/.mempalace/palace`) lives on the **host** and is the single source of truth for all mined memory. Any container that uses it mounts the host directory — the container is an execution environment, not the owner of the data.
+
+- The palace persists independently of any container lifecycle
+- Containers are disposable; your memories are not
+- Mining once on the host and mounting everywhere prevents duplication and silent drift across environments
 
 ---
 
