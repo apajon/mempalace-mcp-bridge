@@ -212,7 +212,29 @@ These are operational rules that prevent the memory store from degrading over ti
 
 ---
 
-## 7. Worked Example: ROS 2 Project
+## 7. Interaction with advanced MemPalace features
+
+> Recent MemPalace features reinforce this strategy rather than replace it.
+
+### Auto-save hooks
+
+MemPalace can automatically persist knowledge as agents work. This makes it easier to capture context without manual effort — but it also increases the risk of noise and duplication. The persistence discipline described in section 5 (durable, non-obvious, deduplicated) becomes more critical, not less. Automatic persistence does not remove the need for discipline — it amplifies it.
+
+### Specialist agents (per wing)
+
+Wings can now carry specialized agent behavior, not just storage scope. This reinforces the project-vs-shared separation already defined in section 3: a wing is no longer just a namespace, it can encode how an agent should reason within that scope. Well-defined wings are now not just organizational, but behavioral boundaries.
+
+### Split command
+
+Entries can be restructured after creation using the split command. This directly supports the "one entry, one rule" principle from guardrail 6: if a compound entry was written under time pressure, it can be broken apart later without loss. Structure is not fixed — it can be refined over time.
+
+### Knowledge graph enrichment
+
+MemPalace can build relationships between entries, linking rooms, types, and cross-references into a traversable graph. Entries that follow this strategy — typed, scoped, cross-referenced — contribute more to the graph than unstructured notes. Structured entries improve not only retrieval, but also graph quality.
+
+---
+
+## 8. Worked Example: ROS 2 Project
 
 This section illustrates the strategy with a concrete case. **ROS 2 is the example; the pattern generalizes to any multi-project engineering context.**
 
@@ -290,7 +312,7 @@ Now every future agent working in this codebase will avoid repeating the same mi
 
 ---
 
-## 8. Failure Modes and Anti-Patterns
+## 9. Failure Modes and Anti-Patterns
 
 ### 8.1 The Dump
 
@@ -342,7 +364,7 @@ Now every future agent working in this codebase will avoid repeating the same mi
 
 ---
 
-## 9. Minimal Starting Setup
+## 10. Minimal Starting Setup
 
 You do not need to implement this strategy fully on day one. A practical starting point:
 
@@ -354,7 +376,7 @@ Avoid over-structuring early. Add rooms only when content justifies them. Refine
 
 ---
 
-## 10. Conclusion
+## 11. Conclusion
 
 MemPalace works well as a flat store for personal notes. It works significantly better as a governed knowledge layer when you apply a small amount of structure:
 
