@@ -174,6 +174,17 @@ Before writing a new entry, search the target wing and room for semantically sim
 
 Use `mempalace_check_duplicate` as a secondary guard when available.
 
+#### Optional: semantic deduplication thresholds
+
+Similarity scoring (e.g. via embeddings) can provide an additional signal when manual judgment is difficult. If your tooling supports it, two thresholds are useful:
+
+- **Soft threshold (~0.5–0.7):** content is related but distinct → review the existing entry and consider enriching it rather than creating a new one.
+- **Hard threshold (~0.8–0.9):** content is a near-duplicate → merge into the existing entry or discard the new one.
+
+**Scope comparisons to the same wing and room.** Global similarity search produces false positives (unrelated entries that share vocabulary) and false negatives (related entries in different scopes that should not be merged). Scoping to wing + room preserves semantic meaning and keeps the signal useful.
+
+These thresholds are optional. The primary deduplication strategy remains write discipline: one rule per entry, search before writing, enrich instead of duplicating.
+
 ### 5.4 Freshness Metadata
 
 For entries that may evolve, include a header:
