@@ -185,6 +185,30 @@ except Exception:
     fi
 fi
 
+# ─── 10. Palace path not inside container filesystem ────────────────────────
+#
+# Resolves the MemPalace storage path and rejects it if it lives under a
+# typical container-only mount point.  Data stored there is lost on rebuild.
+
+PALACE_PATH="${MEMPALACE_PALACE_PATH:-$HOME/.mempalace/palace}"
+# Expand a leading ~ without relying on eval or external tools
+PALACE_ABS="${PALACE_PATH/#\~/$HOME}"
+
+_in_container=false
+for _prefix in /workspace /workspaces /app /opt "$REPO_ROOT"; do
+    case "$PALACE_ABS" in
+        "$_prefix" | "$_prefix"/*) _in_container=true; break ;;
+    esac
+done
+
+if [ "$_in_container" = true ]; then
+    fail "MemPalace path is inside container filesystem ($PALACE_ABS)"
+    echo "        Data stored here will be lost on rebuild or container restart."
+    echo "        Store the palace on host-mounted storage instead (e.g. ~/.mempalace/palace)."
+else
+    pass "Palace path is outside container filesystem ($PALACE_ABS)"
+fi
+
 # ─── Summary ─────────────────────────────────────────────────────────────────
 
 echo ""
