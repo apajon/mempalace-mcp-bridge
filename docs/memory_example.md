@@ -1,6 +1,8 @@
 # Structured Memory Example
 
 A minimal, concrete example of organizing memory with MemPalace.  
+This example shows how to separate project-specific and shared knowledge
+to keep memory consistent and reusable across projects.  
 For the full strategy behind this pattern, see [Advanced Memory Strategy](advanced_memory_strategy.md).
 
 ---
@@ -15,6 +17,9 @@ myapp/          ← project wing
 react/          ← shared wing
   patterns/     ← room: general React knowledge, reusable across projects
 ```
+
+The shared wing (e.g., `react`) can be reused across multiple projects,
+while the project wing remains specific to a single codebase.
 
 ---
 
@@ -58,7 +63,7 @@ Compute totals in selectors instead.
 **Wing:** `react` | **Room:** `patterns`
 
 ```
-[type: shared-knowledge]
+[type: reusable-pattern]
 STATUS: active
 CREATED: 2026-01-20
 
@@ -82,6 +87,8 @@ Before modifying a data-fetching component, query in this order:
 Merge results. Project entries override shared entries only when explicitly marked
 as a local override. If MemPalace is unavailable, fall back to `docs/architecture.md`,
 then `README.md`.
+
+This ensures project constraints are applied first, while still benefiting from shared knowledge.
 
 ---
 
