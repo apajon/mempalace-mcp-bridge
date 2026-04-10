@@ -66,17 +66,15 @@ That's it. VS Code will auto-start the MemPalace MCP server when Copilot Chat op
 
 ## Compatibility
 
-This setup has been tested on:
+Tested on:
 
-- Ubuntu 24.04 (WSL2)
+- Ubuntu 24.04 via WSL2
 - Python 3.12
 - VS Code with GitHub Copilot Chat
 
-Other Linux environments should work, but have not been explicitly tested.
+Other Linux environments may work but are not explicitly tested.
 
 The setup relies on `uv`, which manages Python and dependencies automatically.
-
-> If you're on Windows, using WSL2 is recommended for best compatibility.
 
 ## Test it in Copilot
 
@@ -281,7 +279,7 @@ MCP is a powerful protocol but its developer experience is rough today: JSON con
 
 ## Prerequisites
 
-- Linux (tested on Ubuntu 24.04+, Debian, Arch)
+- Linux (Ubuntu 24.04 via WSL2 recommended)
 - `curl` (to install `uv` if missing)
 - VS Code with [GitHub Copilot Chat](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot-chat) extension
 
