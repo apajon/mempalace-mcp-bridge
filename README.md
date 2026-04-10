@@ -3,7 +3,7 @@
 Give [MemPalace](https://github.com/milla-jovovich/mempalace) a permanent memory inside VS Code Copilot Chat — in under 2 minutes.
 
 MemPalace lets you mine your own files into a local memory store and query that memory from any MCP-compatible client. No cloud, no API key, no Docker.  
-This repo makes the entire setup plug-and-play: one command does everything.
+This repo is a reference setup that demonstrates one way to make MemPalace plug-and-play in VS Code — one command does everything.
 
 ---
 
@@ -12,6 +12,8 @@ This repo makes the entire setup plug-and-play: one command does everything.
 - Not a replacement for MemPalace — it is the integration layer that makes MemPalace easy to use
 - Not a generic MCP template — everything here is specific to MemPalace and VS Code Copilot
 - Not a chat UI or AI assistant — just the fastest path from zero to working MemPalace in Copilot
+
+> This repository does not replace MemPalace. It demonstrates how to use it in a structured and reproducible workflow.
 
 ---
 
@@ -99,14 +101,14 @@ Then ask Copilot about anything in those files.
 
 ## Why this repo exists
 
-The official MemPalace setup requires:
+MemPalace is fully functional on its own. To get started quickly, the standard workflow involves:
 
 - Manual `uv` installation
 - Running `mempalace init` and `mempalace mine` by hand
 - Writing a JSON MCP config with absolute paths filled in manually
 - Restarting VS Code and hoping the server starts
 
-**This repo removes all of that friction:**
+**This repo is a reference implementation that automates those steps:**
 
 - `uv`-based reproducible environment — no virtualenv juggling
 - `setup.sh` does everything in one shot
