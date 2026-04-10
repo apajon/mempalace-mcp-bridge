@@ -4,6 +4,20 @@ This guide explains how to make MemPalace available inside a VS Code devcontaine
 
 ---
 
+## Design principle: host as source of truth
+
+Containers are ephemeral execution environments — they do not own data. The palace must persist independently from the container lifecycle.
+
+Mounting the palace from the host ensures consistency across:
+
+- local tools
+- devcontainers
+- multiple projects
+
+> **Warning:** without this, each environment may initialise its own palace, creating multiple independent stores that silently diverge.
+
+---
+
 ## Design rationale
 
 | Element | Host side | Container side |
