@@ -17,6 +17,34 @@ This repo is a reference setup that demonstrates one way to make MemPalace plug-
 
 ---
 
+## What this repository provides
+
+This repository has two distinct but complementary goals:
+
+### 1. Plug-and-play setup
+
+A fast way to get MemPalace working with VS Code Copilot:
+
+* install dependencies (uv, MemPalace)
+* initialize and mine data
+* configure MCP automatically
+* verify everything is working
+
+This is the primary goal. You can stop here and have a fully working setup.
+
+### 2. Structured usage patterns (optional)
+
+A set of practical patterns for using MemPalace in real workflows:
+
+* organizing memory across projects (project vs shared wings)
+* avoiding duplication and drift over time
+* using a shared palace across local and containerized environments
+* maintaining consistent behavior across sessions
+
+These are optional. They build on top of the setup but are not required to use MemPalace.
+
+---
+
 ## Quickstart
 
 ```bash
