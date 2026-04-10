@@ -295,5 +295,6 @@ MCP is a powerful protocol but its developer experience is rough today: JSON con
 - [Devcontainer integration](docs/devcontainer_integration.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Architecture overview](docs/architecture.md)
+- [Memory usage example](docs/memory_example.md)
 - [Advanced usage: Structured Memory Strategy](docs/advanced_memory_strategy.md)
 - [MemPalace project](https://github.com/milla-jovovich/mempalace)
