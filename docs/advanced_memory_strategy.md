@@ -17,7 +17,7 @@ But as projects grow, a purely flat store starts to show cracks:
 - The same fact gets written multiple times in different phrasings
 - A useful insight disappears into an unsearchable pile of session notes
 
-This document proposes a **structured strategy** to prevent those problems. The core idea is simple: treat your memory store as a first-class engineering artifact, with the same discipline you would apply to a shared codebase.
+This document proposes a **structured strategy** to prevent those problems. The core idea is simple: treat your memory store as a first-class engineering artifact — something that is designed, reviewed, and maintained, not just written to.
 
 ---
 
@@ -45,7 +45,7 @@ A **wing** is the top-level namespace in MemPalace. The key design decision is t
 
 **Do not create one wing per project. Separate by scope, not by workspace.**
 
-In practice, this means most setups land on exactly two wings: one for the current project, one for shared/transverse knowledge. That is intentional — not a limitation.
+In practice, this means most setups land on exactly two wings: one for the current project, one for shared knowledge. That is intentional — not a limitation.
 
 A minimal two-wing model works well for most engineering workflows:
 
@@ -102,7 +102,7 @@ When an agent gathers context before making a decision or change, it should quer
 
 ```
 1. Project wing  →  project-specific rules take precedence
-2. Shared wing   →  transverse knowledge fills in what the project wing lacks
+2. Shared wing   →  shared knowledge fills in what the project wing lacks
 3. Local docs    →  README, architecture files, inline comments
 4. Code search   →  grep/symbol search as last resort
 ```
@@ -250,7 +250,7 @@ The general lifecycle state machine semantics go in the shared wing:
 **Room:** `lifecycle`  
 **Content:**
 ```
-[type: transverse-knowledge]
+[type: shared-knowledge]
 STATUS: active
 CREATED: 2025-01-15
 
