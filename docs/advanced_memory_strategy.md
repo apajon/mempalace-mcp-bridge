@@ -168,22 +168,30 @@ The test: *if this knowledge were lost tomorrow, would we reconstruct it and wri
 
 Before writing a new entry, search the target wing and room for semantically similar content.
 
-- If an existing entry covers **80% or more** of the same information: **enrich** the existing entry rather than creating a new one.
+- If an existing entry covers the same information (see similarity guidance below): **enrich** the existing entry rather than creating a new one.
 - If the new entry supersedes an older one: mark the old entry as `STATUS: obsolete` or delete it.
 - Never create two drawers with the same core rule in different phrasings.
+- When enriching an existing entry, preserve its original rule and extend it — do not rewrite it from scratch.
 
 Use `mempalace_check_duplicate` as a secondary guard when available.
 
-#### Optional: semantic deduplication thresholds
+#### Optional: semantic similarity thresholds
 
-Similarity scoring (e.g. via embeddings) can provide an additional signal when manual judgment is difficult. If your tooling supports it, two thresholds are useful:
+For teams who want a more structured signal when deciding whether to enrich or create, similarity scores can serve as **guidance** (not enforcement). Scoped comparison — checking only within the target wing and room — keeps the signal relevant.
 
-- **Soft threshold (~0.5–0.7):** content is related but distinct → review the existing entry and consider enriching it rather than creating a new one.
-- **Hard threshold (~0.8–0.9):** content is a near-duplicate → merge into the existing entry or discard the new one.
+Suggested ranges as a refinement on top of disciplined writing:
 
-**Scope comparisons to the same wing and room.** Global similarity search produces false positives (unrelated entries that share vocabulary) and false negatives (related entries in different scopes that should not be merged). Scoping to wing + room preserves semantic meaning and keeps the signal useful.
+| Similarity | Signal | Suggested action |
+|-----------|--------|-----------------|
+| ≥ 0.86 | Near-duplicate | Enrich the existing entry; do not create a new one |
+| 0.55 – 0.85 | Related content | Review manually; create only if the new entry captures a genuinely distinct rule, contract, or anti-pattern |
+| < 0.55 | Likely distinct | Creating a new entry is acceptable if persistence criteria are met |
 
-These thresholds are optional. The primary deduplication strategy remains write discipline: one rule per entry, search before writing, enrich instead of duplicating.
+**Type-aware exception:** if two entries are similar in content but differ in type (e.g., one is an `architecture-rule` and the other is an `anti-pattern`), do not merge automatically. Different types serve different purposes and should remain separate even when their similarity score is high.
+
+These thresholds are an advanced refinement — not a replacement for the writing discipline described above. The primary deduplication mechanism is still human judgment.
+
+> See [docs/deduplication.md](deduplication.md) for a compact reference on this pattern.
 
 ### 5.4 Freshness Metadata
 

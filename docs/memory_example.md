@@ -92,4 +92,25 @@ This ensures project constraints are applied first, while still benefiting from 
 
 ---
 
+## Optional: semantic deduplication
+
+Before adding a new entry to a wing and room, check whether similar content already exists **in that same wing and room**. Scoping the comparison keeps it meaningful.
+
+**Example using `myapp/architecture`:**
+
+Suppose you want to add:
+> "All external API calls must be wrapped in the repository layer."
+
+Before creating it, compare against existing `myapp/architecture` entries.
+
+- If a similar entry already exists (e.g., "Data fetching must go through `src/repositories/`"), **enrich that entry** rather than creating a parallel phrasing.
+- If the existing entry covers the same constraint but is phrased differently, extend it and preserve its original rule — don't rewrite it.
+- If the types differ — for example, an existing `architecture-rule` vs. a new `anti-pattern` about the same area — keep them as separate entries even if the content overlaps. They serve different purposes.
+
+Similarity is guidance, not a gate. The primary check is always: *does this entry add something genuinely distinct?* If yes, create it. If not, enrich what exists.
+
+> For threshold ranges and a compact reference, see [deduplication.md](deduplication.md).
+
+---
+
 *For the full strategy, see [Advanced Memory Strategy](advanced_memory_strategy.md).*
