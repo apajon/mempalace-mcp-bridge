@@ -162,3 +162,80 @@ Check for Python tracebacks. Common causes:
 ```bash
 chmod +x scripts/*.sh
 ```
+
+---
+
+## ChromaDB version incompatibility (`No palace found`) {#chromadb-version-incompatibility}
+
+**Symptom:** All MCP tools return:
+
+```json
+{ "error": "No palace found", "hint": "Run: mempalace init <dir> && mempalace mine <dir>" }
+```
+
+…even though the palace was working before, and `~/.mempalace/palace/` exists.
+
+**Cause:**
+
+ChromaDB ≥ 0.6.0 changed the internal format of the `config_json_str` column in
+`~/.mempalace/palace/chroma.sqlite3`. Palaces created with an older version store
+an empty JSON object (`{}`), but the new version expects a `_type` field
+(`"CollectionConfigurationInternal"`). Without it, ChromaDB raises a `KeyError` during
+startup, and MemPalace silently returns `"No palace found"`.
+
+This typically surfaces **after running `bash update.sh`** or after manually upgrading
+the `chromadb` package.
+
+**Automatic fix:**
+
+```bash
+bash verify.sh
+```
+
+`verify.sh` includes a palace health check (step 8) that detects the broken
+`config_json_str`, creates a backup (`chroma.sqlite3.bak`), and repairs it automatically.
+
+`update.sh` also runs this check after every upgrade, so future updates are safe.
+
+**Manual fix** (if the scripts are unavailable):
+
+```bash
+python3 - <<'EOF'
+import sqlite3, json, shutil
+from pathlib import Path
+
+db = Path.home() / ".mempalace/palace/chroma.sqlite3"
+shutil.copy2(db, str(db) + ".bak")   # safety backup
+
+correct = json.dumps({
+    "hnsw_configuration": {
+        "space": "l2", "ef_construction": 100, "ef_search": 100,
+        "num_threads": 12, "M": 16, "resize_factor": 1.2,
+        "batch_size": 100, "sync_threshold": 1000,
+        "_type": "HNSWConfigurationInternal"
+    },
+    "_type": "CollectionConfigurationInternal"
+})
+
+conn = sqlite3.connect(str(db))
+c = conn.cursor()
+c.execute("SELECT id, config_json_str FROM collections")
+for col_id, cfg in c.fetchall():
+    if not json.loads(cfg or "{}").get("_type"):
+        c.execute("UPDATE collections SET config_json_str = ? WHERE id = ?", (correct, col_id))
+        print(f"Fixed collection {col_id}")
+conn.commit()
+conn.close()
+print("Done.")
+EOF
+```
+
+**Verify the repair:**
+
+```bash
+bash verify.sh
+# Expected: [PASS] Palace accessible (N drawers)
+```
+
+**Your data is safe:** this fix only updates a configuration field. No drawers, wings, or
+knowledge graph entries are affected.
