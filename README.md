@@ -53,6 +53,7 @@ That's it. VS Code will auto-start the MemPalace MCP server when Copilot Chat op
   - [When to re-run `setup.sh`](#when-to-re-run-setupsh)
   - [Edge cases](#edge-cases)
 - [How it works](#how-it-works)
+- [Shared memory across environments](#shared-memory-across-environments)
 - [MCP config and paths](#mcp-config-and-paths)
 - [Frequent errors](#frequent-errors)
 - [Design insight](#design-insight)
@@ -205,6 +206,20 @@ mempalace.mcp_server   ← launched automatically by VS Code via .vscode/mcp.jso
 ```
 
 `setup.sh` writes `.vscode/mcp.json` with the absolute path to your `uv` binary, so VS Code can start the server without any manual configuration.
+
+---
+
+## Shared memory across environments
+
+The MemPalace store (`~/.mempalace/palace`) lives on the host machine and is shared across every environment that can reach it — your local terminal, VS Code on the host, and any devcontainer.
+
+When working inside a devcontainer, the bridge mounts that store read-only so the container can query the same memories without duplicating or diverging them.
+
+This means:
+
+- **No duplication** — mine once, query everywhere
+- **Consistent context** — the same notes and decisions are available whether you're in a container or on bare metal
+- **Better multi-project workflows** — switch projects or environments without losing your memory
 
 ---
 
