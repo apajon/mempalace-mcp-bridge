@@ -20,6 +20,20 @@ The palace is shared between the host and the container: everything the agent st
 
 ---
 
+## Notes on MemPalace initialization
+
+MemPalace initialization can behave differently depending on whether it runs on the host or inside a container: path resolution and config file location may vary, leading to inconsistent results if the setup is not explicit.
+
+This integration sidesteps those issues by design:
+
+* The bridge stays on the host and is mounted into the container at a fixed path (`/opt/mempalace-mcp-bridge`).
+* The palace directory is shared via a bind mount, so both environments point to the same data.
+* `MEMPALACE_PALACE_PATH` is set explicitly in the MCP config, overriding any config inherited from another machine.
+
+This avoids friction from environment-specific path differences and ensures predictable behavior regardless of where the container runs.
+
+---
+
 ## Prerequisites (host)
 
 > The only requirement is that `MEMPALACE_BRIDGE_HOST_DIR` points to a valid local clone of `mempalace-mcp-bridge` on your host machine.
