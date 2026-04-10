@@ -1,6 +1,7 @@
 # MemPalace MCP Bridge for VS Code Copilot
 
 Give [MemPalace](https://github.com/milla-jovovich/mempalace) a permanent memory inside VS Code Copilot Chat — in under 2 minutes.
+Optional structured usage patterns included.
 
 MemPalace lets you mine your own files into a local memory store and query that memory from any MCP-compatible client. No cloud, no API key, no Docker.  
 This repo is a reference setup that demonstrates one way to make MemPalace plug-and-play in VS Code — one command does everything.
