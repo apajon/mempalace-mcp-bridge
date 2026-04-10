@@ -4,33 +4,20 @@ This guide explains how to make MemPalace available inside a VS Code devcontaine
 
 ---
 
-## Design principles
+## Design rationale
 
 | Element | Host side | Container side |
 |---|---|---|
 | **MCP bridge** (`mempalace-mcp-bridge`) | free path — defined by `MEMPALACE_BRIDGE_HOST_DIR` | mounted read-only at `/opt/mempalace-mcp-bridge` |
 | **Palace** (`~/.mempalace`) | `~/.mempalace` | `~/.mempalace` of the container user |
 
-The **host path** is flexible: each developer clones the repo wherever they like.
-The **container path** is fixed: `/opt/mempalace-mcp-bridge`. Scripts, MCP config, and hooks hard-code it — no assumptions about the host machine.
+**The bridge is not cloned inside the container.** Keeping it on the host and mounting it at a fixed path (`/opt/mempalace-mcp-bridge`) means scripts, MCP config, and hooks always reference the same location regardless of where each developer stores the repo on their machine.
 
-> The bridge is mounted **read-only** from the host into `/opt/mempalace-mcp-bridge` inside the container. The directory must exist on the host — an empty or missing mount breaks the entire integration.
+**A shared palace is used** so that everything the agent stores inside the container is immediately visible on the host, and vice versa. The bind mount ensures both environments point to the same data without copying or syncing.
 
-The palace is shared between the host and the container: everything the agent stores inside the container is immediately visible on the host, and vice versa.
+**`MEMPALACE_PALACE_PATH` is set explicitly** in the MCP config to override any `config.json` that may have been inherited from another machine. This eliminates path/config inconsistencies caused by environment-specific differences in home directory layout or previous initializations.
 
----
-
-## Notes on MemPalace initialization
-
-MemPalace initialization can behave differently depending on whether it runs on the host or inside a container: path resolution and config file location may vary, leading to inconsistent results if the setup is not explicit.
-
-This integration sidesteps those issues by design:
-
-* The bridge stays on the host and is mounted into the container at a fixed path (`/opt/mempalace-mcp-bridge`).
-* The palace directory is shared via a bind mount, so both environments point to the same data.
-* `MEMPALACE_PALACE_PATH` is set explicitly in the MCP config, overriding any config inherited from another machine.
-
-This avoids friction from environment-specific path differences and ensures predictable behavior regardless of where the container runs.
+> The bridge is mounted **read-only** at `/opt/mempalace-mcp-bridge`. Nothing is written back to the host repo.
 
 ---
 
@@ -84,20 +71,7 @@ No directory is created automatically. If the variable is missing or wrong, the 
 
 ## Step 2 — Mount the bridge and the palace
 
-### Option A — docker-compose.yml
-
-```yaml
-services:
-  dev:
-    volumes:
-      # MCP bridge (read-only — venv is installed inside the container)
-      - ${MEMPALACE_BRIDGE_HOST_DIR}:/opt/mempalace-mcp-bridge:ro
-
-      # Palace shared with the host (read/write)
-      - ~/.mempalace:/home/<container-user>/.mempalace
-```
-
-### Option B — devcontainer.json (without Compose)
+In `devcontainer.json`, add the following mounts:
 
 ```json
 "mounts": [
@@ -171,7 +145,6 @@ VS Code Copilot will start the MCP server automatically when the chat is opened.
 | File | Change |
 |---|---|
 | `devcontainer.json` | Validation `initializeCommand` + `mounts` with `${localEnv:MEMPALACE_BRIDGE_HOST_DIR}` |
-| `docker-compose.yml` | Bridge volume `${MEMPALACE_BRIDGE_HOST_DIR}:/opt/mempalace-mcp-bridge:ro` + palace bind mount |
 | `post-create.sh` | Conditional block: `uv sync` + `check_palace_health.sh` |
 | `.vscode/mcp.json` | MCP server config with `env.MEMPALACE_PALACE_PATH` |
 
