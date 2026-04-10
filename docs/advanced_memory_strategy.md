@@ -168,7 +168,7 @@ The test: *if this knowledge were lost tomorrow, would we reconstruct it and wri
 
 Before writing a new entry, search the target wing and room for semantically similar content.
 
-- If an existing entry covers the same information: **enrich** the existing entry rather than creating a new one.
+- If an existing entry covers the same information (see similarity guidance below): **enrich** the existing entry rather than creating a new one.
 - If the new entry supersedes an older one: mark the old entry as `STATUS: obsolete` or delete it.
 - Never create two drawers with the same core rule in different phrasings.
 - When enriching an existing entry, preserve its original rule and extend it — do not rewrite it from scratch.
