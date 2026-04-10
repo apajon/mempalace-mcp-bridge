@@ -278,6 +278,7 @@ MCP is a powerful protocol but its developer experience is rough today: JSON con
 ## Further reading
 
 - [MCP VS Code integration details](docs/mcp_vscode.md)
+- [Devcontainer integration](docs/devcontainer_integration.md)
 - [Troubleshooting](docs/troubleshooting.md)
 - [Architecture overview](docs/architecture.md)
 - [MemPalace project](https://github.com/milla-jovovich/mempalace)
