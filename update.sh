@@ -79,6 +79,18 @@ fi
 uv pip install --upgrade --python "$VENV_PYTHON" mempalace
 ok "MemPalace upgraded"
 
+# ─── 2b. Palace health check after upgrade ───────────────────────────────────
+# ChromaDB upgrades can introduce config_json_str format changes that break
+# palace access. Detect and auto-repair before the verify step.
+
+info "Checking palace health after upgrade..."
+HEALTH_EXIT=0
+bash "$REPO_ROOT/scripts/check_palace_health.sh" || HEALTH_EXIT=$?
+if [ "$HEALTH_EXIT" -eq 1 ]; then
+    echo "[ERROR] Palace health check failed. See docs/troubleshooting.md#chromadb-version-incompatibility" >&2
+    exit 1
+fi
+
 # ─── 3. Revalidate .vscode/mcp.json ──────────────────────────────────────────
 #
 # The config embeds absolute paths (uv binary + repo root).

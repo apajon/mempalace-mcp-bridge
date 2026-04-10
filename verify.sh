@@ -121,7 +121,33 @@ for a in srv.get('args', []):
     fi
 fi
 
-# ─── 8. MemPalace version staleness check (best effort, never blocks) ────────
+# ─── 8. Palace health check — ChromaDB compatibility ────────────────────────
+#
+# Delegates to scripts/check_palace_health.sh which detects the known
+# version-mismatch bug (config_json_str missing _type) and auto-repairs it.
+
+if [ -f "$VENV_PYTHON" ] && "$VENV_PYTHON" -c "import mempalace" 2>/dev/null; then
+    HEALTH_EXIT=0
+    HEALTH_OUTPUT=$(bash "$REPO_ROOT/scripts/check_palace_health.sh" 2>&1) || HEALTH_EXIT=$?
+
+    if [ "$HEALTH_EXIT" -eq 0 ]; then
+        # Extract the message after [OK] or [WARN] for display
+        if echo "$HEALTH_OUTPUT" | grep -q "\[WARN\]"; then
+            echo "$HEALTH_OUTPUT"
+            pass "Palace auto-repaired and accessible"
+        else
+            DRAWER_COUNT=$(echo "$HEALTH_OUTPUT" | grep -oP '\d+ drawers' | grep -oP '\d+' || true)
+            pass "Palace accessible${DRAWER_COUNT:+ ($DRAWER_COUNT drawers)}"
+        fi
+    elif [ "$HEALTH_EXIT" -eq 2 ]; then
+        echo "[INFO]  Palace not yet initialized — skipping health check"
+    else
+        echo "$HEALTH_OUTPUT"
+        fail "Palace not accessible — see docs/troubleshooting.md#chromadb-version-incompatibility"
+    fi
+fi
+
+# ─── 9. MemPalace version staleness check (best effort, never blocks) ────────
 #
 # Query PyPI for the latest published version and compare it to the locally
 # installed one.  A version mismatch is shown as a warning only — it does not

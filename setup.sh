@@ -27,6 +27,18 @@ bash "$REPO_ROOT/scripts/bootstrap.sh"
 info "Step 2/4 — Initializing MemPalace..."
 bash "$REPO_ROOT/scripts/init_palace.sh"
 
+# ─── 2b. Palace health check ──────────────────────────────────────────────────
+# Detects and auto-repairs ChromaDB config_json_str incompatibilities that can
+# occur after a ChromaDB upgrade. Safe to run on a brand-new palace (no-op).
+
+HEALTH_EXIT=0
+bash "$REPO_ROOT/scripts/check_palace_health.sh" || HEALTH_EXIT=$?
+# exit 2 means no palace yet (normal here) — not an error
+if [ "$HEALTH_EXIT" -eq 1 ]; then
+    echo "[ERROR] Palace health check failed — aborting setup." >&2
+    exit 1
+fi
+
 # ─── 3. Mine sample notes ─────────────────────────────────────────────────────
 
 info "Step 3/4 — Mining sample notes..."
