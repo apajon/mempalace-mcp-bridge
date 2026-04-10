@@ -14,28 +14,37 @@ Ce guide explique comment rendre MemPalace disponible à l'intérieur d'un devco
 Le **chemin hôte** est configurable : chaque développeur clone le repo où il veut.
 Le **chemin conteneur** est fixe : `/opt/mempalace-mcp-bridge`. Les scripts, la config MCP et les hooks l'utilisent en dur — aucune hypothèse sur la machine hôte.
 
+> Le bridge est monté **en lecture seule** depuis l'hôte vers `/opt/mempalace-mcp-bridge` à l'intérieur du conteneur. Le répertoire doit exister sur l'hôte — un mount vide ou absent casse l'intégration entière.
+
 Le palace est partagé entre l'hôte et le conteneur : tout ce que l'agent mémorise dans le conteneur est directement visible sur l'hôte, et inversement.
 
 ---
 
 ## Prérequis (hôte)
 
+> La seule exigence est que `MEMPALACE_BRIDGE_HOST_DIR` pointe vers un clone local valide de `mempalace-mcp-bridge` sur ta machine hôte.
+
 1. Clone le repo `mempalace-mcp-bridge` à l'endroit de ton choix :
 
    ```bash
    git clone https://github.com/apajon/mempalace-mcp-bridge <chemin-de-ton-choix>
-   # Exemple : ~/src/mempalace-mcp-bridge, /opt/mempalace-mcp-bridge, etc.
+   # Exemple : /home/alice/src/mempalace-mcp-bridge, /opt/mempalace-mcp-bridge, etc.
    ```
 
 2. Exporte la variable `MEMPALACE_BRIDGE_HOST_DIR` pointant vers ce clone, et rends-la permanente :
 
    ```bash
-   # Ajoute dans ~/.bashrc, ~/.zshrc ou équivalent :
-   export MEMPALACE_BRIDGE_HOST_DIR=<chemin-de-ton-choix>
+   # Utilise un chemin absolu (recommandé) :
+   export MEMPALACE_BRIDGE_HOST_DIR=/absolute/path/to/mempalace-mcp-bridge
+
+   # Ajoute cette ligne dans ~/.bashrc, ~/.zshrc ou équivalent pour la rendre permanente.
    ```
 
-   > VS Code lit cette variable au lancement. Si elle n'est pas dans ton shell de démarrage,
-   > relance VS Code depuis un terminal où elle est définie.
+   > **Utilise toujours un chemin absolu.** Le tilde `~` peut ne pas être développé correctement selon l'environnement shell ou le contexte Docker, entraînant des erreurs silencieuses de mount.
+
+   > **VS Code lancé depuis une interface graphique n'hérite pas des variables d'environnement du shell.** Si `MEMPALACE_BRIDGE_HOST_DIR` n'est pas visible depuis VS Code :
+   > * soit définis la variable dans ton profil shell (`~/.bashrc`, `~/.zshrc`) et relance VS Code depuis un terminal (`code .`) ;
+   > * soit lance toujours VS Code depuis un terminal où la variable est exportée.
 
 3. Initialise le palace sur l'hôte si ce n'est pas encore fait :
 
@@ -158,10 +167,11 @@ VS Code Copilot démarrera automatiquement le serveur MCP au lancement du chat.
 
 | Symptôme | Cause probable | Solution |
 |---|---|---|
-| `initializeCommand` échoue : `MEMPALACE_BRIDGE_HOST_DIR is not set` | Variable non exportée dans le shell qui lance VS Code | Ajouter `export MEMPALACE_BRIDGE_HOST_DIR=<chemin>` dans `~/.bashrc` ou `~/.zshrc`, relancer VS Code depuis un terminal et reconstruire |
+| `initializeCommand` échoue : `MEMPALACE_BRIDGE_HOST_DIR is not set` | Variable non exportée dans le shell qui lance VS Code | Ajouter `export MEMPALACE_BRIDGE_HOST_DIR=/absolute/path/to/mempalace-mcp-bridge` dans `~/.bashrc` ou `~/.zshrc`, puis lancer VS Code depuis un terminal (`code .`) et reconstruire |
+| VS Code ne voit pas `MEMPALACE_BRIDGE_HOST_DIR` | VS Code lancé depuis l'interface graphique — il n'hérite pas des variables du shell | Définir la variable dans `~/.bashrc` ou `~/.zshrc`, puis lancer VS Code depuis un terminal (`code .`) |
 | `initializeCommand` échoue : `does not exist` | Variable définie mais répertoire absent | Vérifier que `$MEMPALACE_BRIDGE_HOST_DIR` pointe vers la racine du clone et que celui-ci est bien présent |
 | `MemPalace: non disponible, skip` | Mount vide — `pyproject.toml` absent | Vérifier que `MEMPALACE_BRIDGE_HOST_DIR` pointe vers la racine du repo (pas un sous-dossier) |
-| Mount silencieusement vide (Docker Desktop / WSL) | Chemin Windows (`C:\...`) passé au lieu du chemin Linux | Utiliser le chemin Linux (ex. `/home/user/...`) dans `MEMPALACE_BRIDGE_HOST_DIR` |
+| Mount silencieusement vide (Docker Desktop / WSL) | Chemin Windows (`C:\...`) passé au lieu du chemin Linux | Utiliser le chemin Linux absolu (ex. `/home/user/src/mempalace-mcp-bridge`) dans `MEMPALACE_BRIDGE_HOST_DIR` |
 | `"No palace found"` dans les outils MCP | Palace non monté ou `MEMPALACE_PALACE_PATH` absent/incorrect | Vérifier le bind mount `~/.mempalace` et la clé `env.MEMPALACE_PALACE_PATH` dans `mcp.json` |
 | Palace présent sur l'hôte mais vide dans le conteneur | `<container-user>` incorrect dans le mount ou dans `MEMPALACE_PALACE_PATH` | Vérifier `whoami` dans le conteneur, corriger les deux occurrences de `<container-user>` |
 | Serveur MCP ne démarre pas | Chemin `uv` incorrect dans `mcp.json` | Vérifier avec `which uv` dans un terminal du devcontainer et corriger la clé `command` |
