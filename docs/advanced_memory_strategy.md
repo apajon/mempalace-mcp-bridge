@@ -45,6 +45,8 @@ A **wing** is the top-level namespace in MemPalace. The key design decision is t
 
 **Do not create one wing per project. Separate by scope, not by workspace.**
 
+In practice, this means most setups land on exactly two wings: one for the current project, one for shared/transverse knowledge. That is intentional — not a limitation.
+
 A minimal two-wing model works well for most engineering workflows:
 
 | Wing | Scope | What goes here |
@@ -108,6 +110,18 @@ When an agent gathers context before making a decision or change, it should quer
 **Merging results:** Combine entries from both wings. If a project entry and a shared entry conflict, the project entry wins — but only if it is explicitly documented as a local override. A project entry that simply contradicts a shared rule without explanation should be treated as a potential inconsistency, not a silent override.
 
 **Fallback behavior:** If MemPalace tools are unavailable, agents must continue silently with local sources. Memory unavailability is never a reason to block a task. Design your instruction files accordingly.
+
+**Agent decision flow:**
+
+```
+[project wing] → [shared wing] → [local docs] → [code search]
+        ↓
+   merged context
+        ↓
+    decision
+        ↓
+  persist (if durable)
+```
 
 **Practical pattern for instruction files:**
 
@@ -328,7 +342,19 @@ Now every future agent working in this codebase will avoid repeating the same mi
 
 ---
 
-## 9. Conclusion
+## 9. Minimal Starting Setup
+
+You do not need to implement this strategy fully on day one. A practical starting point:
+
+- **1 project wing** — for the current project
+- **1 shared wing** — for reusable platform or framework knowledge
+- **2–3 rooms** — `architecture` and `anti-patterns` cover the highest-value content
+
+Avoid over-structuring early. Add rooms only when content justifies them. Refine the scope split only when patterns of mis-scoping emerge. The structure is a tool, not a goal.
+
+---
+
+## 10. Conclusion
 
 MemPalace works well as a flat store for personal notes. It works significantly better as a governed knowledge layer when you apply a small amount of structure:
 
@@ -338,7 +364,7 @@ MemPalace works well as a flat store for personal notes. It works significantly 
 - **Deduplication discipline**: enrich before you create.
 - **Graceful fallback**: memory unavailability is never a blocker.
 
-The effort required is low. The payoff — agents that consistently apply the right rules, without being re-explained every session — compounds over time.
+The effort required is low. Teams can start with a single project wing and one shared wing, using just two or three rooms. The structure can grow incrementally as patterns emerge — there is no need to design the full taxonomy upfront. The payoff — agents that consistently apply the right rules, without being re-explained every session — compounds over time.
 
 This is not the only way to use MemPalace effectively. It is one way that has proven practical in engineering workflows where multiple agents work across multiple projects and need shared, persistent context.
 
