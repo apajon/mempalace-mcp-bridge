@@ -130,19 +130,25 @@ Then ask Copilot about anything in those files.
 
 ## Why this repo exists
 
-MemPalace is fully functional on its own. To get started quickly, the standard workflow involves:
+Using MemPalace in a real development workflow is not plug-and-play.
 
-- Manual `uv` installation
-- Running `mempalace init` and `mempalace mine` by hand
-- Writing a JSON MCP config with absolute paths filled in manually
-- Restarting VS Code and hoping the server starts
+In practice, you end up:
 
-**This repo is a reference implementation that automates those steps:**
+- installing `uv` manually
+- running `mempalace init` and `mine` by hand
+- writing MCP JSON configs with absolute paths
+- restarting VS Code and hoping the server actually starts
 
-- `uv`-based reproducible environment — no virtualenv juggling
-- `setup.sh` does everything in one shot
-- MCP config is generated automatically with the correct paths
-- `verify.sh` confirms the full stack is working
+This friction is enough to stop many users before they get value.
+
+This repository exists to remove that friction:
+
+- one command sets everything up
+- MCP config is generated automatically
+- VS Code works immediately
+- the full pipeline is verified
+
+The goal is simple: go from zero to a working MemPalace setup in under 2 minutes.
 
 ---
 
