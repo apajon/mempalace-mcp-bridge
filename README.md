@@ -64,7 +64,7 @@ Then ask Copilot about anything in those files.
 Copilot Chat
      │
      ▼
-MCP Bridge  ← launched automatically by VS Code via .vscode/mcp.json
+MemPalace MCP Server  ← launched automatically by VS Code via .vscode/mcp.json
      │
      ▼
 MemPalace
