@@ -34,7 +34,7 @@ bash setup.sh
 
 code .
 
-> **Important:** open the repository root folder in VS Code (`code .` from inside `mempalace-mcp-bridge/`). Opening a subfolder will prevent MCP from loading.
+# **Important:** open the repository root folder in VS Code (`code .` from inside `mempalace-mcp-bridge/`). Opening a subfolder will prevent MCP from loading.
 
 # 4. Open Copilot Chat and try:
 
