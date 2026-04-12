@@ -2,48 +2,18 @@
 
 Give [MemPalace](https://github.com/milla-jovovich/mempalace) a permanent memory inside VS Code Copilot Chat — in under 2 minutes.
 
-Optional structured usage patterns included.
-
-MemPalace lets you mine your own files into a local memory store and query that memory from any MCP-compatible client. No cloud, no API key, no Docker.  
-This repo is a reference setup that demonstrates one way to make MemPalace plug-and-play in VS Code — one command does everything.
-
 ---
 
-## What this is not
+## Why this exists
 
-- Not a replacement for MemPalace — it is the integration layer that makes MemPalace easy to use
-- Not a generic MCP template — everything here is specific to MemPalace and VS Code Copilot
-- Not a chat UI or AI assistant — just the fastest path from zero to working MemPalace in Copilot
+MemPalace is powerful, but not plug-and-play in real workflows.
+This repo fixes that.
 
-> This repository does not replace MemPalace. It demonstrates how to use it in a structured and reproducible workflow.
+In practice, getting it running means installing `uv` manually, writing MCP JSON configs with absolute paths, running `init` and `mine` by hand, and restarting VS Code hoping the server actually starts.
 
----
+That friction stops most users before they get any value.
 
-## What this repository provides
-
-This repository has two distinct but complementary goals:
-
-### 1. Plug-and-play setup
-
-A fast way to get MemPalace working with VS Code Copilot:
-
-* install dependencies (uv, MemPalace)
-* initialize and mine data
-* configure MCP automatically
-* verify everything is working
-
-This is the primary goal. You can stop here and have a fully working setup.
-
-### 2. Structured usage patterns (optional)
-
-A set of practical patterns for using MemPalace in real workflows:
-
-* organizing memory across projects (project vs shared wings)
-* avoiding duplication and drift over time
-* using a shared palace across local and containerized environments
-* maintaining consistent behavior across sessions
-
-These are optional. They build on top of the setup but are not required to use MemPalace.
+**This repo removes that friction.** One command installs everything, generates the config, mines sample data, and verifies the full stack. Setup takes about 2 minutes.
 
 ---
 
@@ -64,61 +34,22 @@ code .
 #    "What architecture decisions have I documented?"
 ```
 
-That's it. VS Code will auto-start the MemPalace MCP server when Copilot Chat opens. The first time may take a few seconds while VS Code initializes the server.
+VS Code auto-starts the MemPalace MCP server when Copilot Chat opens.
 
 > **Important:** open the repository root folder in VS Code (`code .` from inside `mempalace-mcp-bridge/`). Opening a subfolder will prevent MCP from loading.
 
+You can stop here — setup is complete. Advanced usage is optional.
+
 ---
 
-<details>
-<summary>Table of Contents</summary>
+## What you get
 
-<!-- START doctoc generated TOC please keep comment here to allow auto update -->
-<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+- **Fully local** — no cloud, no API key, no Docker
+- **Auto-start** — VS Code launches the MCP server automatically, no terminal needed
+- **Mine your own files** — point it at any folder and Copilot can query your notes, decisions, and docs
+- **Portable** — works across local and containerized environments with a shared palace
 
-- [Compatibility](#compatibility)
-- [Test it in Copilot](#test-it-in-copilot)
-- [Why this repo exists](#why-this-repo-exists)
-- [Verification](#verification)
-- [Updating](#updating)
-  - [What `update.sh` does](#what-updatesh-does)
-  - [What `update.sh` does NOT do](#what-updatesh-does-not-do)
-  - [When to re-run `setup.sh`](#when-to-re-run-setupsh)
-  - [Edge cases](#edge-cases)
-- [How it works](#how-it-works)
-- [Host as source of truth](#host-as-source-of-truth)
-- [Shared memory across environments](#shared-memory-across-environments)
-- [MCP config and paths](#mcp-config-and-paths)
-- [Frequent errors](#frequent-errors)
-- [Design insight](#design-insight)
-- [Repository structure](#repository-structure)
-- [Requirements](#requirements)
-- [Further reading](#further-reading)
-
-<!-- END doctoc generated TOC please keep comment here to allow auto update -->
-
-</details>
-
-## Compatibility
-
-Tested on:
-
-- Ubuntu 24.04 via WSL2
-- VS Code with GitHub Copilot Chat
-
-Other Linux environments may work but are not explicitly tested.
-
-## Test it in Copilot
-
-After setup, open Copilot Chat and try:
-
-| Prompt | Expected result |
-|--------|-----------------|
-| `What architecture decisions have I documented?` | MemPalace returns decisions from `examples/sample_notes/decisions.md` |
-| `What do I know about ROS2 debugging?` | MemPalace returns notes from `ros2_debug.md` |
-| `Summarize my architecture notes` | MemPalace retrieves and Copilot summarizes `architecture_notes.md` |
-
-To mine your own notes into memory:
+To mine your own notes after setup:
 
 ```bash
 uv run --directory . mempalace mine /path/to/your/project
@@ -128,233 +59,60 @@ Then ask Copilot about anything in those files.
 
 ---
 
-## Why this repo exists
-
-Using MemPalace in a real development workflow is not plug-and-play.
-
-In practice, you end up:
-
-- installing `uv` manually
-- running `mempalace init` and `mine` by hand
-- writing MCP JSON configs with absolute paths
-- restarting VS Code and hoping the server actually starts
-
-This friction is enough to stop many users before they get value.
-
-This repository exists to remove that friction:
-
-- one command sets everything up
-- MCP config is generated automatically
-- VS Code works immediately
-- the full pipeline is verified
-
-The goal is simple: go from zero to a working MemPalace setup in under 2 minutes.
-
----
-
-## Verification
-
-```bash
-bash verify.sh
-```
-
-Expected output:
+## How it fits together
 
 ```
-[PASS] uv found: /home/user/.local/bin/uv (uv 0.x.x)
-[PASS] Virtual environment found at .venv/
-[PASS] mempalace package importable
-[PASS] mempalace CLI responds
-[PASS] Sample notes found in examples/sample_notes/ (3 files)
-[PASS] VS Code MCP config present and populated (.vscode/mcp.json)
-[PASS] MCP server starts without error (exact command from .vscode/mcp.json)
-
- All 7 checks passed — you're ready to use MemPalace in VS Code!
+VsCode Copilot Chat
+     │
+     ▼
+MCP Server  ← launched automatically by VS Code via .vscode/mcp.json
+     │
+     ▼
+MemPalace
+     │
+     ▼
+Local Memory (palace)  ← ~/.mempalace/palace
 ```
 
----
-
-## Updating
-
-When MemPalace publishes new releases, or when this repo gets new commits, run:
-
-```bash
-git pull
-bash update.sh
-```
-
-Then reload your VS Code window (`Ctrl+Shift+P` → **Developer: Reload Window**).
-
-### What `update.sh` does
-
-| Action | Notes |
-|--------|-------|
-| `git pull` | Pulls the latest changes from this repo |
-| Upgrades MemPalace in `.venv` | `uv pip install --upgrade mempalace` |
-| Checks `.vscode/mcp.json` paths | Regenerates only if paths are wrong or stale |
-| Runs `verify.sh` | Confirms the full stack is still healthy |
-
-### What `update.sh` does NOT do
-
-- **Never touches `~/.mempalace/palace`** — your notes and memories are always preserved
-- Does not delete or recreate `.venv`
-- Does not overwrite `.vscode/mcp.json` if the paths are still correct
-
-### When to re-run `setup.sh`
-
-Re-run `setup.sh` only if your environment is severely broken (e.g. `.venv` deleted,
-`uv` uninstalled). `setup.sh` is also idempotent — it will skip steps that are
-already complete, including skipping MCP config regeneration if the paths are correct.
-
-### Edge cases
-
-| Situation | What happens |
-|-----------|-------------|
-| Repo moved to a different path | `update.sh` detects the stale path and regenerates `.vscode/mcp.json` |
-| `uv` reinstalled to a different location | Same — stale command path is detected and fixed |
-| `.venv` partially broken | `verify.sh` fails; re-run `bash setup.sh` to repair |
-| MemPalace introduces breaking changes | `verify.sh` reports failures with actionable messages |
-| No internet access | Version staleness check is skipped silently; update still works |
+`setup.sh` generates `.vscode/mcp.json` with the absolute path to your `uv` binary, so VS Code can start the server without any manual configuration.
 
 ---
 
-VS Code handles server startup automatically. If you need to test the server manually:
+## Beyond setup — structured memory (optional)
 
-```bash
-bash run.sh
-```
+The setup alone is already useful. But MemPalace works significantly better when memory is structured.
 
-Keep the terminal open while using Copilot Chat. Press `Ctrl+C` to stop.
+This repo includes patterns for:
 
----
+- **Separating project vs. shared knowledge** — avoid polluting general knowledge with project-specific rules
+- **Avoiding duplication and drift** — mine once, query from any environment
+- **Consistent context across sessions** — decisions persist and remain retrievable
 
-## How it works
-
-```
-VS Code Copilot Chat
-       │  MCP stdio
-       ▼
-mempalace.mcp_server   ← launched automatically by VS Code via .vscode/mcp.json
-       │
-       ▼
-~/.mempalace/palace    ← local vector store of your mined files
-```
-
-`setup.sh` writes `.vscode/mcp.json` with the absolute path to your `uv` binary, so VS Code can start the server without any manual configuration.
+→ See [docs/advanced_memory_strategy.md](docs/advanced_memory_strategy.md) for the full approach.
 
 ---
 
-## Host as source of truth
+## Compatibility
 
-The MemPalace palace (`~/.mempalace/palace`) lives on the **host** and is the single source of truth for all mined memory. Any container that uses it mounts the host directory — the container is an execution environment, not the owner of the data.
-
-- The palace persists independently of any container lifecycle
-- Containers are disposable; your memories are not
-- Mining once on the host and mounting everywhere prevents duplication and silent drift across environments
-
----
-
-## Shared memory across environments
-
-The MemPalace store (`~/.mempalace/palace`) lives on the host machine and is shared across every environment that can reach it — your local terminal, VS Code on the host, and any devcontainer.
-
-When working inside a devcontainer, the bridge mounts that store read-only so the container can query the same memories without duplicating or diverging them.
-
-This means:
-
-- **No duplication** — mine once, query everywhere
-- **Consistent context** — the same notes and decisions are available whether you're in a container or on bare metal
-- **Better multi-project workflows** — switch projects or environments without losing your memory
-
----
-
-## MCP config and paths
-
-`.vscode/mcp.json` is generated by `setup.sh`. It contains machine-specific absolute paths and must not be committed:
-
-```json
-{
-  "servers": {
-    "mempalace": {
-      "type": "stdio",
-      "command": "/home/yourname/.local/bin/uv",
-      "args": ["run", "--directory", "/home/yourname/mempalace-mcp-bridge", "python", "-m", "mempalace.mcp_server"]
-    }
-  }
-}
-```
-
-Key points:
-
-- `command` — absolute path to your `uv` binary (varies per machine)
-- `--directory` — absolute path to this repo (varies per machine)
-- The file is intentionally listed in `.gitignore`
-- **If you move or rename the repo folder, re-run `bash setup.sh`** to regenerate the config with the correct paths
-
----
-
-## Frequent errors
-
-| Error | Fix |
-|-------|-----|
-| `uv: command not found` | Re-run `bash setup.sh` — it installs uv automatically |
-| MCP server not starting | Run `bash verify.sh` to diagnose; check `.vscode/mcp.json` |
-| No results from Copilot | Mine your files: `uv run --directory . mempalace mine <path>` |
-| MCP tools not available | Reload VS Code window; ensure Copilot Chat trusts the server |
-| Copilot answers but ignores MemPalace | Copilot can silently skip MCP tools — explicitly mention memory in your prompt (e.g. "using my notes, …") to force tool use |
-
----
-
-## Design insight
-
-MCP is a powerful protocol but its developer experience is rough today: JSON config files with hard-coded paths, no standard discovery, and no feedback when something silently fails. This repo is a concrete example of wrapping that friction so that a real tool — MemPalace — works immediately in a real workflow without any manual plumbing.
-
----
-
-## Repository structure
-
-```
-.
-├── setup.sh                  # ONE command: full setup + config generation
-├── update.sh                 # Safe update: pull, upgrade, revalidate
-├── run.sh                    # Start MCP server manually (fallback)
-├── verify.sh                 # Verify the entire stack
-├── scripts/
-│   ├── bootstrap.sh          # Install uv + MemPalace
-│   ├── init_palace.sh        # Initialize MemPalace
-│   ├── mine_sample_data.sh   # Mine example notes
-│   └── run_manual_mcp.sh     # MCP server entry point
-├── examples/
-│   ├── sample_notes/         # Markdown files mined on first setup
-│   └── mcp/
-│       └── vscode.mcp.json   # Template (setup.sh writes the real one)
-├── docs/
-│   ├── mcp_vscode.md         # VS Code MCP integration details
-│   ├── troubleshooting.md    # Common issues
-│   └── architecture.md       # How MemPalace fits in the stack
-└── .vscode/
-    ├── settings.json
-    └── mcp.json              # Generated by setup.sh — do not edit manually
-```
-
----
-
-## Requirements
-
-- Linux
-- `curl` (used to install `uv` if missing)
-- VS Code with [GitHub Copilot Chat](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot-chat) extension
+- Linux (tested on Ubuntu 24.04 via WSL2)
+- VS Code with [GitHub Copilot Chat](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot-chat)
+- `curl` required (`setup.sh` uses it to install `uv`)
 
 `setup.sh` installs `uv` and Python 3.12 automatically.
 
 ---
 
-## Further reading
+## Docs
 
-- [MCP VS Code integration details](docs/mcp_vscode.md)
-- [Devcontainer integration](docs/devcontainer_integration.md)
-- [Troubleshooting](docs/troubleshooting.md)
-- [Architecture overview](docs/architecture.md)
-- [Memory usage example](docs/memory_example.md)
-- [Advanced usage: Structured Memory Strategy](docs/advanced_memory_strategy.md)
-- [MemPalace project](https://github.com/milla-jovovich/mempalace)
+If you want to go deeper:
+
+| Topic | Link |
+|-------|------|
+| Architecture overview | [docs/architecture.md](docs/architecture.md) |
+| MCP config and VS Code integration | [docs/mcp_vscode.md](docs/mcp_vscode.md) |
+| Devcontainer integration | [docs/devcontainer_integration.md](docs/devcontainer_integration.md) |
+| Update and verify workflow | [docs/update_workflow.md](docs/update_workflow.md) |
+| Troubleshooting | [docs/troubleshooting.md](docs/troubleshooting.md) |
+| Structured memory example | [docs/memory_example.md](docs/memory_example.md) |
+| Advanced memory strategy | [docs/advanced_memory_strategy.md](docs/advanced_memory_strategy.md) |
+| MemPalace project | [github.com/milla-jovovich/mempalace](https://github.com/milla-jovovich/mempalace) |
