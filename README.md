@@ -4,16 +4,19 @@ Give [MemPalace](https://github.com/milla-jovovich/mempalace) a permanent memory
 
 ---
 
-## Why this exists
+## What you get
 
-MemPalace is powerful, but not plug-and-play in real workflows.
-This repo fixes that.
+- Persistent memory inside Copilot Chat
+- Fully local — no cloud, no API key, no Docker
+- Auto-start — no terminal, VS Code handles everything
+- Mine your own files — query your notes, docs, and decisions
+- Portable — works across environments with a shared palace
 
-In practice, getting it running means installing `uv` manually, writing MCP JSON configs with absolute paths, running `init` and `mine` by hand, and restarting VS Code hoping the server actually starts.
+---
 
-That friction stops most users before they get any value.
+## Install
 
-**This repo removes that friction.** One command installs everything, generates the config, mines sample data, and verifies the full stack. Setup takes about 2 minutes.
+Download the latest release: https://github.com/apajon/mempalace-mcp-bridge/releases
 
 ---
 
@@ -28,10 +31,16 @@ cd mempalace-mcp-bridge
 bash setup.sh
 
 # 3. Open this folder in VS Code
-code .
 
-# 4. Open Copilot Chat (Ctrl+Alt+I) and ask:
-#    "What architecture decisions have I documented?"
+Important: open the repository root folder (code .). Opening a subfolder will prevent MCP from loading.
+
+# 4. Open Copilot Chat and try:
+
+"Remember that I like Python."
+
+Restart VS Code, then ask:
+
+"What do you remember about me?"
 ```
 
 VS Code auto-starts the MemPalace MCP server when Copilot Chat opens.
@@ -42,12 +51,7 @@ You can stop here — setup is complete. Advanced usage is optional.
 
 ---
 
-## What you get
-
-- **Fully local** — no cloud, no API key, no Docker
-- **Auto-start** — VS Code launches the MCP server automatically, no terminal needed
-- **Mine your own files** — point it at any folder and Copilot can query your notes, decisions, and docs
-- **Portable** — works across local and containerized environments with a shared palace
+## Use your own data
 
 To mine your own notes after setup:
 
@@ -56,6 +60,18 @@ uv run --directory . mempalace mine /path/to/your/project
 ```
 
 Then ask Copilot about anything in those files.
+
+---
+
+## Why this exists
+
+MemPalace is powerful, but not plug-and-play in real workflows.
+
+Setting it up requires multiple manual steps and breaks the flow of using Copilot Chat.
+
+That friction stops most users before they get any value.
+
+This repo removes that friction. Setup takes about 2 minutes.
 
 ---
 
