@@ -47,7 +47,7 @@ VS Code auto-starts the MemPalace MCP server when Copilot Chat opens.
 
 > **Important:** open the repository root folder in VS Code (`code .` from inside `mempalace-mcp-bridge/`). Opening a subfolder will prevent MCP from loading.
 
-You can stop here — setup is complete. Advanced usage is optional.
+Setup is complete. Advanced usage is optional.
 
 ---
 
