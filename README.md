@@ -6,7 +6,8 @@ Give [MemPalace](https://github.com/milla-jovovich/mempalace) a permanent memory
 
 ## Why this exists
 
-MemPalace is powerful, but it is **not plug-and-play**.
+MemPalace is powerful, but not plug-and-play in real workflows.
+This repo fixes that.
 
 In practice, getting it running means installing `uv` manually, writing MCP JSON configs with absolute paths, running `init` and `mine` by hand, and restarting VS Code hoping the server actually starts.
 
@@ -43,7 +44,7 @@ You can stop here — setup is complete. Advanced usage is optional.
 
 ## What you get
 
-- **No cloud, no API key, no Docker** — MemPalace runs entirely on your machine
+- **Fully local** — no cloud, no API key, no Docker
 - **Auto-start** — VS Code launches the MCP server automatically, no terminal needed
 - **Mine your own files** — point it at any folder and Copilot can query your notes, decisions, and docs
 - **Portable** — works across local and containerized environments with a shared palace
@@ -61,10 +62,10 @@ Then ask Copilot about anything in those files.
 ## How it fits together
 
 ```
-Copilot Chat
+VsCode Copilot Chat
      │
      ▼
-MemPalace MCP Server  ← launched automatically by VS Code via .vscode/mcp.json
+MCP Server  ← launched automatically by VS Code via .vscode/mcp.json
      │
      ▼
 MemPalace
@@ -102,6 +103,8 @@ This repo includes patterns for:
 ---
 
 ## Docs
+
+If you want to go deeper:
 
 | Topic | Link |
 |-------|------|
