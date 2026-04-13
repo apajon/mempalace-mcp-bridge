@@ -1,27 +1,25 @@
-# Global Copilot Instructions (Repository-Wide)
+# Global Copilot Instructions
 
-These instructions are mandatory for every Copilot Chat interaction in this repository.
+For any repository-related question, proposal, debugging task, or code change, follow this process.
 
-## MemPalace-first context policy
+## Mandatory context retrieval
 
-Before answering any repository-related question, proposing changes, or editing code, the agent must gather context in this order:
+Before answering:
 
-1. Query MemPalace project wing `mempalace_mcp_bridge` first.
-2. Query shared wing(s) (for example `python`, `mcp`) second.
-3. Merge results. A project entry overrides shared knowledge only when explicitly documented as a local override.
-4. If MemPalace is unavailable, continue using this fallback chain without blocking the task:
+1. Query MemPalace project wing `mempalace_mcp_bridge`
+2. Query shared wings relevant to the task, such as `python` and `mcp`
+3. Merge results
+   - project knowledge overrides shared knowledge only when explicitly documented as a local override
+4. If MemPalace is unavailable, continue immediately with this fallback chain:
    - `docs/architecture.md`
    - `README.md`
-   - Workspace code/document search
+   - workspace code and document search
 
-## Mandatory behavior
+Do not silently skip context retrieval.
+Memory unavailability must never block the task.
 
-- Do not skip MemPalace lookup for repository-context questions.
-- If lookup is skipped or unavailable, explicitly state this and follow the fallback chain.
-- Memory unavailability must never block user requests.
-- For durable, repeatable, non-obvious findings, persist memory using project conventions.
+## Mandatory response contract
 
-## Source of truth
+For any repository-related response, begin with this block:
 
-For detailed wing/room structure and persistence format, follow:
-- `.github/instructions/mempalace-mcp-bridge.instructions.md`
+Context source:
