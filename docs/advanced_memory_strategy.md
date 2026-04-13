@@ -75,8 +75,14 @@ Suggested standard room slugs (hyphenated lowercase, create only when content ex
 | `conventions` | Naming, style, tooling conventions |
 | `validation` | Testing rules, CI gates, quality checks |
 | `migration-notes` | Breaking changes, version upgrades, deprecation paths |
+| `incident-log` | Concrete incidents: symptoms, diagnosis, root cause, fix, prevention rule |
+| `debugging` | Diagnostic commands, debug patterns, tooling tips, investigation workflows |
+| `observability` | Logging, metrics, tracing, correlation rules, runtime visibility expectations |
+| `failure-modes` | Known failure classes: triggers, symptoms, recovery strategy, operator guidance |
 
 You do not need all of these. Start with `architecture` and `anti-patterns`. Add rooms when content justifies them.
+
+These operational rooms are useful when a project has meaningful runtime behavior and repeated operational learning. Keep their boundaries explicit: `incident-log` records a specific event that happened, `failure-modes` generalizes recurring classes of failure, `debugging` captures how to investigate, and `observability` captures how to make investigation possible earlier and more reliably.
 
 ### 3.3 Entry Types — Classify What You Store
 

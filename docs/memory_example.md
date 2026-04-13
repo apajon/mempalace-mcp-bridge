@@ -92,6 +92,31 @@ This ensures project constraints are applied first, while still benefiting from 
 
 ---
 
+## Optional: Operational rooms
+
+When a project has meaningful runtime behavior, add operational rooms only once you
+have enough real content to justify them:
+
+```
+myapp/
+  incident-log/  ← specific bugs or incidents that actually happened
+  debugging/     ← repeatable diagnosis commands, tools, and investigation patterns
+  observability/ ← logging, metrics, traces, and correlation guidance
+  failure-modes/ ← known classes of failure, triggers, and recovery strategy
+```
+
+Use them with clear boundaries:
+
+- `incident-log` = one concrete incident, with symptoms, root cause, fix, and prevention
+- `failure-modes` = generalized known risk for a component or subsystem
+- `debugging` = how to inspect and diagnose
+- `observability` = what signals should exist so diagnosis is possible
+
+This keeps operational knowledge retrievable without mixing one-off incidents with
+general rules or preventive instrumentation guidance.
+
+---
+
 ## Optional: semantic deduplication
 
 Before adding a new entry to a wing and room, check whether similar content already exists **in that same wing and room**. Scoping the comparison keeps it meaningful.
