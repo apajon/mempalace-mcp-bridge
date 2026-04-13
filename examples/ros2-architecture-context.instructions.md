@@ -3,7 +3,7 @@
 > **Scope:** This instruction file governs how AI agents gather context and persist knowledge
 > when working in a ROS 2 project that uses MemPalace as a governed knowledge layer.
 > It is a concrete instance of the pattern described in
-> [Advanced Memory Strategy](docs/advanced_memory_strategy.md).
+> [Advanced Memory Strategy](../docs/advanced_memory_strategy.md).
 
 ---
 
