@@ -1,25 +1,18 @@
-# Global Copilot Instructions
+# Copilot Instructions
 
-For any repository-related question, proposal, debugging task, or code change, follow this process.
+## Context priority
 
-## Mandatory context retrieval
+For any task related to this repository:
 
-Before answering:
-
-1. Query MemPalace project wing `mempalace_mcp_bridge`
-2. Query shared wings relevant to the task, such as `python` and `mcp`
-3. Merge results
-   - project knowledge overrides shared knowledge only when explicitly documented as a local override
-4. If MemPalace is unavailable, continue immediately with this fallback chain:
+1. Use MemPalace project wing `mempalace_mcp_bridge` as the primary context source
+2. Complement with relevant shared wings if needed
+3. If MemPalace is unavailable, fallback to:
    - `docs/architecture.md`
    - `README.md`
-   - workspace code and document search
+   - workspace search
 
-Do not silently skip context retrieval.
-Memory unavailability must never block the task.
+## Rules
 
-## Mandatory response contract
-
-For any repository-related response, begin with this block:
-
-Context source:
+- Do not invent repository-specific facts
+- Prefer explicit project knowledge over generic assumptions
+- If context is missing, state assumptions clearly and proceed
