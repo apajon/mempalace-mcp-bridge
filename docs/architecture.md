@@ -91,6 +91,19 @@ The contents are not versioned (excluded by `.gitignore`). If you delete this di
 
 ---
 
+## Copilot context strategy
+
+**Problem:** Copilot may rely on opaque internal context, especially on first interaction with a repository.
+
+**Solution:**
+
+- `.github/copilot-instructions.md` — global instructions that bias context selection toward MemPalace
+- `.github/instructions/mempalace-mcp-bridge.instructions.md` — scoped instructions providing project-specific conventions and memory structure
+
+**Limitation:** Behavior is probabilistic. Instructions steer context selection but do not enforce it strictly.
+
+---
+
 ## Why uv?
 
 `uv` is used instead of `pip` + `venv` because:
