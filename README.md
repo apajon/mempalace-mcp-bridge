@@ -98,6 +98,16 @@ Local Memory (palace)  ← ~/.mempalace/palace
 
 ---
 
+## Copilot context guidance
+
+Copilot is configured to use MemPalace as its primary context source via `.github/copilot-instructions.md`.
+
+Query order: MemPalace project wing → shared wings → `docs/architecture.md` → `README.md` → workspace search.
+
+This improves first-response relevance. It is not a strict guarantee — Copilot behavior is probabilistic.
+
+---
+
 ## Beyond setup — structured memory (optional)
 
 The setup alone is already useful. But MemPalace works significantly better when memory is structured.
