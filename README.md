@@ -199,6 +199,7 @@ If you want to go deeper:
 | Architecture overview | [docs/architecture.md](docs/architecture.md) |
 | MCP config and VS Code integration | [docs/mcp_vscode.md](docs/mcp_vscode.md) |
 | Palace format detection | [docs/palace_format_detection.md](docs/palace_format_detection.md) |
+| Reconstruction migration assessment | [docs/chromadb_reconstruction_migration.md](docs/chromadb_reconstruction_migration.md) |
 | Devcontainer integration | [docs/devcontainer_integration.md](docs/devcontainer_integration.md) |
 | Update and verify workflow | [docs/update_workflow.md](docs/update_workflow.md) |
 | Troubleshooting | [docs/troubleshooting.md](docs/troubleshooting.md) |
