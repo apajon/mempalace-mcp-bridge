@@ -7,6 +7,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV_PYTHON="$REPO_ROOT/.venv/bin/python"
+MANIFEST_SCRIPT="$REPO_ROOT/scripts/palace_manifest.py"
 
 info()  { echo "[INFO]  $*"; }
 ok()    { echo "[OK]    $*"; }
@@ -30,11 +31,14 @@ info "Initializing MemPalace..."
 # Palace storage defaults to ~/.mempalace/palace (or path set via --palace).
 cd "$REPO_ROOT"
 uv run --python "$VENV_PYTHON" mempalace init "$REPO_ROOT"
+"$VENV_PYTHON" "$MANIFEST_SCRIPT"
 
 ok "MemPalace initialized"
 echo ""
 echo "MemPalace palace storage is at:"
 echo "  ~/.mempalace/palace    (default — override with --palace flag)"
+echo "Manifest:"
+echo "  mempalace-bridge-manifest.json"
 echo ""
 echo "Next:"
 echo "  bash scripts/mine_sample_data.sh   # Mine the example notes"
