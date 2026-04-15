@@ -1,6 +1,14 @@
 # MemPalace MCP Bridge for VS Code Copilot
 
-Give [MemPalace](https://github.com/milla-jovovich/mempalace) a permanent memory inside VS Code Copilot Chat — in under 2 minutes.
+Give [MemPalace](https://github.com/milla-jovovich/mempalace) a persistent local memory inside VS Code Copilot Chat.
+
+This repo provides a plug-and-play bridge:
+
+- one-command setup
+- generated VS Code MCP config
+- automatic MCP server startup through VS Code
+- full-stack verification with `verify.sh`
+- a stable ChromaDB `0.6.x` line for existing palaces
 
 ---
 
@@ -10,13 +18,31 @@ Give [MemPalace](https://github.com/milla-jovovich/mempalace) a permanent memory
 - Fully local — no cloud, no API key, no Docker
 - Auto-start — no terminal, VS Code handles everything
 - Mine your own files — query your notes, docs, and decisions
-- Portable — works across environments with a shared palace
+- Built-in verification — `verify.sh` checks the environment, the generated MCP config, and that the MCP server actually starts
+- Palace safety checks — setup and update detect known ChromaDB compatibility issues and keep the bridge on the tested `0.6.x` line
+- Reusable across environments with a shared palace
+
+> **Compatibility status**
+> This bridge currently targets the tested ChromaDB `0.6.x` line (`chromadb<0.7`).
+> This is intentional: newer ChromaDB `1.x` releases can break older MemPalace palaces.
+> If you already rely on existing palaces, this repo prioritizes stability over latest-package tracking.
 
 ---
 
 ## Install
 
 Download the latest release: https://github.com/apajon/mempalace-mcp-bridge/releases
+
+---
+
+## Who this is for
+
+This repo is for you if:
+
+- you want MemPalace working fast inside VS Code Copilot Chat
+- you want a local setup with no manual MCP wiring
+- you want a stable setup for existing palaces on Chroma `0.6.x`
+- you prefer reproducibility over chasing the newest Chroma release
 
 ---
 
@@ -37,8 +63,18 @@ code .
 
 > **Important:** open the repository root folder in VS Code (`code .` from inside `mempalace-mcp-bridge/`). Opening a subfolder will prevent MCP from loading.
 
+Optionally verify the generated setup before opening Copilot Chat:
+
 ```bash
-# 4. Open Copilot Chat and try:
+bash verify.sh
+```
+
+---
+
+## Test it in Copilot
+
+```bash
+# Open Copilot Chat and try:
 
 "Remember that I like Python."
 
@@ -64,6 +100,15 @@ uv run --directory . mempalace mine /path/to/your/project
 ```
 
 Then ask Copilot about anything in those files.
+
+---
+
+## Known limitations
+
+- This bridge currently targets ChromaDB `0.6.x`, not ChromaDB `1.x`
+- Existing palaces are preserved, but automatic migration to ChromaDB `1.x` is not supported here
+- Linux / WSL2 is the tested path today
+- Copilot behavior remains probabilistic even with MemPalace as the preferred context source
 
 ---
 
@@ -98,16 +143,6 @@ Local Memory (palace)  ← ~/.mempalace/palace
 
 ---
 
-## Copilot context guidance
-
-Copilot is configured to use MemPalace as its primary context source via `.github/copilot-instructions.md`.
-
-Query order: MemPalace project wing → shared wings → `docs/architecture.md` → `README.md` → workspace search.
-
-This improves first-response relevance. It is not a strict guarantee — Copilot behavior is probabilistic.
-
----
-
 ## Beyond setup — structured memory (optional)
 
 The setup alone is already useful. But MemPalace works significantly better when memory is structured.
@@ -127,8 +162,19 @@ This repo includes patterns for:
 - Linux (tested on Ubuntu 24.04 via WSL2)
 - VS Code with [GitHub Copilot Chat](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot-chat)
 - `curl` required (`setup.sh` uses it to install `uv`)
+- ChromaDB `0.6.x` line pinned intentionally via `chromadb<0.7`
 
 `setup.sh` installs `uv` and Python 3.12 automatically.
+
+---
+
+## Copilot context guidance
+
+Copilot is configured to use MemPalace as its primary context source via `.github/copilot-instructions.md`.
+
+Query order: MemPalace project wing → shared wings → `docs/architecture.md` → `README.md` → workspace search.
+
+This improves first-response relevance. It is not a strict guarantee — Copilot behavior is probabilistic.
 
 ---
 
