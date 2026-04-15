@@ -90,6 +90,8 @@ MemPalace stores its indexed data locally. Default location:
 
 The contents are not versioned (excluded by `.gitignore`). If you delete this directory, you need to re-run `mempalace mine`.
 
+During initialization, the bridge writes `mempalace-bridge-manifest.json` into the palace root. This is a narrow safety artifact, not a general config layer: it captures creation-time versions plus the storage compatibility line so future tooling can identify bridge-created palaces and reason about older storage more safely.
+
 ---
 
 ## Copilot context strategy

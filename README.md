@@ -20,6 +20,7 @@ This repo provides a plug-and-play bridge:
 - Mine your own files — query your notes, docs, and decisions
 - Built-in verification — `verify.sh` checks the environment, the generated MCP config, and that the MCP server actually starts
 - Palace safety checks — setup, update, verify, and runtime startup reject unsupported `chromadb` versions and keep the bridge on the tested `0.6.x` line
+- Palace manifest — setup writes `mempalace-bridge-manifest.json` into the palace root for version traceability
 - Reusable across environments with a shared palace
 
 > **Compatibility status**
@@ -142,6 +143,8 @@ Local Memory (palace)  ← ~/.mempalace/palace
 ```
 
 `setup.sh` generates `.vscode/mcp.json` with the absolute path to your `uv` binary, so VS Code can start the server without any manual configuration.
+
+The same setup step writes `mempalace-bridge-manifest.json` into the palace root. The file is intentionally small and easy to inspect manually: it records the bridge version, MemPalace version, ChromaDB version, Python version, storage backend and format, the supported compatibility line, and the creation timestamp. If a valid manifest already exists, setup preserves it. If the file exists but is malformed, setup replaces it with a fresh valid manifest.
 
 ---
 
