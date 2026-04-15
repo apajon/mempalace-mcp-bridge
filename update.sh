@@ -76,7 +76,8 @@ if ! command -v uv &>/dev/null; then
     fail "uv not found. Run: bash setup.sh to restore the environment."
 fi
 
-uv pip install --upgrade --python "$VENV_PYTHON" "mempalace>=3.0.0" "chromadb<0.7"
+uv pip install --upgrade --python "$VENV_PYTHON" "mempalace>=3.0.0" "chromadb>=0.6,<0.7"
+bash "$REPO_ROOT/scripts/check_chromadb_version.sh"
 ok "MemPalace upgraded"
 
 # ─── 2b. Palace health check after upgrade ───────────────────────────────────
@@ -137,9 +138,22 @@ try:
 except Exception:
     print('')
 " 2>/dev/null || true)
+        STORED_ARGS=$("$VENV_PYTHON" -c "
+import json
+try:
+    with open('$MCP_CONFIG') as f:
+        cfg = json.load(f)
+    print(json.dumps(cfg['servers']['mempalace'].get('args', [])))
+except Exception:
+    print('')
+" 2>/dev/null || true)
+        EXPECTED_ARGS_JSON='["run", "--directory", "'"$REPO_ROOT"'", "python", "scripts/run_mcp_server.py"]'
 
         if [ -n "$STORED_UV" ] && [ ! -x "$STORED_UV" ]; then
             warn "uv path in MCP config ('$STORED_UV') no longer exists — will regenerate."
+            NEEDS_REGEN=true
+        elif [ "$STORED_ARGS" != "$EXPECTED_ARGS_JSON" ]; then
+            warn "MCP config uses an outdated startup command — will regenerate."
             NEEDS_REGEN=true
         fi
     fi
@@ -156,7 +170,7 @@ if [ "$NEEDS_REGEN" = true ]; then
     "mempalace": {
       "type": "stdio",
       "command": "$UV_PATH",
-      "args": ["run", "--directory", "$REPO_ROOT", "python", "-m", "mempalace.mcp_server"]
+      "args": ["run", "--directory", "$REPO_ROOT", "python", "scripts/run_mcp_server.py"]
     }
   }
 }

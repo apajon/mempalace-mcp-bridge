@@ -28,4 +28,4 @@ echo "[INFO]  Press Ctrl+C to stop."
 echo ""
 
 cd "$REPO_ROOT"
-exec uv run --python "$VENV_PYTHON" python -m mempalace.mcp_server
+exec uv run --python "$VENV_PYTHON" python scripts/run_mcp_server.py

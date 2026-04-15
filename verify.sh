@@ -47,7 +47,21 @@ else
     fail "mempalace not importable — run: bash setup.sh"
 fi
 
-# ─── 4. mempalace CLI responds ───────────────────────────────────────────────
+# ─── 4. ChromaDB version supported ───────────────────────────────────────────
+
+if [ -f "$VENV_PYTHON" ]; then
+    CHROMA_EXIT=0
+    CHROMA_OUTPUT=$(bash "$REPO_ROOT/scripts/check_chromadb_version.sh" 2>&1) || CHROMA_EXIT=$?
+
+    if [ "$CHROMA_EXIT" -eq 0 ]; then
+        pass "Installed $(echo "$CHROMA_OUTPUT" | sed 's/^\[OK\][[:space:]]*//')"
+    else
+        echo "$CHROMA_OUTPUT"
+        fail "Installed chromadb is outside the supported 0.6.x line"
+    fi
+fi
+
+# ─── 5. mempalace CLI responds ───────────────────────────────────────────────
 
 if [ -f "$VENV_PYTHON" ]; then
     if uv run --python "$VENV_PYTHON" mempalace --help &>/dev/null; then
@@ -59,7 +73,7 @@ if [ -f "$VENV_PYTHON" ]; then
     fi
 fi
 
-# ─── 5. Sample notes present ─────────────────────────────────────────────────
+# ─── 6. Sample notes present ─────────────────────────────────────────────────
 
 NOTES_DIR="$REPO_ROOT/examples/sample_notes"
 if [ -d "$NOTES_DIR" ] && ls "$NOTES_DIR"/*.md &>/dev/null; then
@@ -69,20 +83,31 @@ else
     fail "Sample notes missing in $NOTES_DIR"
 fi
 
-# ─── 6. VS Code MCP config exists and has correct content ───────────────────
+# ─── 7. VS Code MCP config exists and has correct content ───────────────────
 
 MCP_CONFIG="$REPO_ROOT/.vscode/mcp.json"
 if [ -f "$MCP_CONFIG" ]; then
-    if grep -q "mempalace" "$MCP_CONFIG" && ! grep -q "ABSOLUTE/PATH" "$MCP_CONFIG"; then
+    EXPECTED_ARGS_JSON='["run", "--directory", "'"$REPO_ROOT"'", "python", "scripts/run_mcp_server.py"]'
+    STORED_ARGS=$("$VENV_PYTHON" -c "
+import json
+try:
+    with open('$MCP_CONFIG') as f:
+        cfg = json.load(f)
+    print(json.dumps(cfg['servers']['mempalace'].get('args', [])))
+except Exception:
+    print('')
+" 2>/dev/null || true)
+
+    if grep -q "mempalace" "$MCP_CONFIG" && ! grep -q "ABSOLUTE/PATH" "$MCP_CONFIG" && [ "$STORED_ARGS" = "$EXPECTED_ARGS_JSON" ]; then
         pass "VS Code MCP config present and populated ($MCP_CONFIG)"
     else
-        fail "VS Code MCP config still has placeholder paths — run: bash setup.sh"
+        fail "VS Code MCP config is missing the guarded startup command — run: bash setup.sh"
     fi
 else
     fail "VS Code MCP config missing — run: bash setup.sh"
 fi
 
-# ─── 7. MCP server actually starts (runs the exact command VS Code will use) ─
+# ─── 8. MCP server actually starts (runs the exact command VS Code will use) ─
 #
 # Parse command + args from .vscode/mcp.json, start the process with stdin
 # held open, wait 2 seconds, verify the process is still running, then kill it.
@@ -121,7 +146,7 @@ for a in srv.get('args', []):
     fi
 fi
 
-# ─── 8. Palace health check — ChromaDB compatibility ────────────────────────
+# ─── 9. Palace health check — ChromaDB compatibility ────────────────────────
 #
 # Delegates to scripts/check_palace_health.sh which detects the known
 # version-mismatch bug (config_json_str missing _type) and auto-repairs it.
@@ -147,7 +172,7 @@ if [ -f "$VENV_PYTHON" ] && "$VENV_PYTHON" -c "import mempalace" 2>/dev/null; th
     fi
 fi
 
-# ─── 9. MemPalace version staleness check (best effort, never blocks) ────────
+# ─── 10. MemPalace version staleness check (best effort, never blocks) ───────
 #
 # Query PyPI for the latest published version and compare it to the locally
 # installed one.  A version mismatch is shown as a warning only — it does not
@@ -185,7 +210,7 @@ except Exception:
     fi
 fi
 
-# ─── 10. Palace path not inside container filesystem ────────────────────────
+# ─── 11. Palace path not inside container filesystem ─────────────────────────
 #
 # Resolves the MemPalace storage path and rejects it if it lives under a
 # typical container-only mount point.  Data stored there is lost on rebuild.
@@ -222,4 +247,3 @@ fi
 echo "════════════════════════════════════════"
 
 [ "$FAIL" -eq 0 ]
-

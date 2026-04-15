@@ -70,6 +70,7 @@ mkdir -p "$VSCODE_DIR"
 _needs_regen=true
 if [ -f "$MCP_CONFIG" ] && ! grep -q "ABSOLUTE/PATH" "$MCP_CONFIG" 2>/dev/null; then
     VENV_PYTHON="$REPO_ROOT/.venv/bin/python"
+    EXPECTED_ARGS_JSON='["run", "--directory", "'"$REPO_ROOT"'", "python", "scripts/run_mcp_server.py"]'
     _stored_dir=$("$VENV_PYTHON" -c "
 import json
 try:
@@ -90,8 +91,17 @@ try:
 except Exception:
     print('')
 " 2>/dev/null || true)
+    _stored_args=$("$VENV_PYTHON" -c "
+import json
+try:
+    with open('$MCP_CONFIG') as f:
+        cfg = json.load(f)
+    print(json.dumps(cfg['servers']['mempalace'].get('args', [])))
+except Exception:
+    print('')
+" 2>/dev/null || true)
 
-    if [ "$_stored_dir" = "$REPO_ROOT" ] && [ "$_stored_uv" = "$UV_PATH" ]; then
+    if [ "$_stored_dir" = "$REPO_ROOT" ] && [ "$_stored_uv" = "$UV_PATH" ] && [ "$_stored_args" = "$EXPECTED_ARGS_JSON" ]; then
         _needs_regen=false
     fi
 fi
@@ -103,7 +113,7 @@ if [ "$_needs_regen" = true ]; then
     "mempalace": {
       "type": "stdio",
       "command": "$UV_PATH",
-      "args": ["run", "--directory", "$REPO_ROOT", "python", "-m", "mempalace.mcp_server"]
+      "args": ["run", "--directory", "$REPO_ROOT", "python", "scripts/run_mcp_server.py"]
     }
   }
 }
