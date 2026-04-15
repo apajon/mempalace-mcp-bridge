@@ -22,7 +22,7 @@ Mounting the palace from the host ensures consistency across:
 
 | Element | Host side | Container side |
 |---|---|---|
-| **MCP bridge** (`mempalace-mcp-bridge`) | free path — defined by `MEMPALACE_BRIDGE_HOST_DIR` | mounted read-only at `/opt/mempalace-mcp-bridge` |
+| **MCP bridge** (`mempalace-mcp-bridge`) | `~/git/mempalace-mcp-bridge` | mounted read-only at `/opt/mempalace-mcp-bridge` |
 | **Palace** (`~/.mempalace`) | `~/.mempalace` | `~/.mempalace` of the container user |
 
 **The bridge is not cloned inside the container.** Keeping it on the host and mounting it at a fixed path (`/opt/mempalace-mcp-bridge`) means scripts, MCP config, and hooks always reference the same location regardless of where each developer stores the repo on their machine.
@@ -37,49 +37,41 @@ Mounting the palace from the host ensures consistency across:
 
 ## Prerequisites (host)
 
-> The only requirement is that `MEMPALACE_BRIDGE_HOST_DIR` points to a valid local clone of `mempalace-mcp-bridge` on your host machine.
+> The reference integration assumes the bridge is cloned on the host at `~/git/mempalace-mcp-bridge`.
 
-1. Clone the `mempalace-mcp-bridge` repo wherever you like:
-
-   ```bash
-   git clone https://github.com/apajon/mempalace-mcp-bridge <your-chosen-path>
-   # Example: /home/alice/src/mempalace-mcp-bridge, /opt/mempalace-mcp-bridge, etc.
-   ```
-
-2. Export `MEMPALACE_BRIDGE_HOST_DIR` pointing to that clone and make it permanent:
+1. Clone the `mempalace-mcp-bridge` repo at that location:
 
    ```bash
-   # Use an absolute path (recommended):
-   export MEMPALACE_BRIDGE_HOST_DIR=/absolute/path/to/mempalace-mcp-bridge
-
-   # Add this line to ~/.bashrc, ~/.zshrc or equivalent to make it permanent.
+   mkdir -p ~/git
+   git clone https://github.com/apajon/mempalace-mcp-bridge.git ~/git/mempalace-mcp-bridge
    ```
 
-   > **Always use an absolute path.** The tilde `~` may not expand correctly depending on the shell environment or Docker context, causing silent mount failures.
+   > If your team uses another host path, replace `~/git/mempalace-mcp-bridge` consistently in the devcontainer mounts and host-side setup commands below.
 
-   > **VS Code launched from a GUI does not inherit shell environment variables.** If `MEMPALACE_BRIDGE_HOST_DIR` is not visible from VS Code:
-   > * either define the variable in your shell profile (`~/.bashrc`, `~/.zshrc`) and relaunch VS Code from a terminal (`code .`);
-   > * or always launch VS Code from a terminal where the variable is exported.
-
-3. Initialise the palace on the host if you haven't already:
+2. Initialise the palace on the host if you haven't already:
 
    ```bash
-   bash "$MEMPALACE_BRIDGE_HOST_DIR/setup.sh"
+   bash ~/git/mempalace-mcp-bridge/setup.sh
    ```
 
-4. Make sure `uv` is available in the devcontainer Docker image.
+3. Make sure `uv` is available in the devcontainer Docker image.
 
 ---
 
-## Step 1 — Validate the host variable (initializeCommand)
+## Step 1 — Prepare the host mount point (initializeCommand)
 
-In `devcontainer.json`, add an `initializeCommand` that fails early if the variable is missing or points to a non-existent directory. The command runs **on the host**, before Docker creates the container:
+In `devcontainer.json`, add an `initializeCommand` that prepares the host-side directory before Docker creates the container:
 
 ```json
-"initializeCommand": "test -n \"${MEMPALACE_BRIDGE_HOST_DIR}\" && test -d \"${MEMPALACE_BRIDGE_HOST_DIR}\" || (echo 'ERROR: MEMPALACE_BRIDGE_HOST_DIR is not set or does not exist. Export it to the path of your mempalace-mcp-bridge clone and rebuild.' && exit 1)"
+"initializeCommand": "mkdir -p ${HOME:-$(echo ~)}/git/mempalace-mcp-bridge || true"
 ```
 
-No directory is created automatically. If the variable is missing or wrong, the build stops with an explicit message.
+This does two things:
+
+- creates the expected host directory if it does not exist yet;
+- tolerates cases where `HOME` is empty because VS Code's `userEnvProbe` timed out or the shell startup was incomplete.
+
+The `|| true` prevents spurious devcontainer failures if the host shell environment is only partially initialised.
 
 ---
 
@@ -89,13 +81,15 @@ In `devcontainer.json`, add the following mounts:
 
 ```json
 "mounts": [
-  "source=${localEnv:MEMPALACE_BRIDGE_HOST_DIR},target=/opt/mempalace-mcp-bridge,type=bind,consistency=cached,readonly",
+  "source=${localEnv:HOME}/git/mempalace-mcp-bridge,target=/opt/mempalace-mcp-bridge,type=bind,consistency=cached,readonly",
   "source=${localEnv:HOME}/.mempalace,target=/home/<container-user>/.mempalace,type=bind"
 ]
 ```
 
 > Replace `<container-user>` with the username inside the container (`dev`, `vscode`, `user`, etc.).
 > Check with `whoami` in a devcontainer terminal.
+>
+> If `${localEnv:HOME}` is unreliable on your platform, replace it with an explicit absolute host path.
 
 ---
 
@@ -105,19 +99,21 @@ In `post-create.sh`, add the following block. It installs the bridge dependencie
 
 ```bash
 MEMPALACE_DIR=/opt/mempalace-mcp-bridge
+MEMPALACE_VENV=/home/<container-user>/.venv/mempalace-mcp-bridge
 
 if [ -f "$MEMPALACE_DIR/pyproject.toml" ]; then
     echo 'MemPalace: installing dependencies...'
-    uv sync --directory "$MEMPALACE_DIR" --quiet
+    UV_PROJECT_ENVIRONMENT="$MEMPALACE_VENV" uv sync --directory "$MEMPALACE_DIR" --quiet
     echo 'MemPalace: checking palace health...'
     bash "$MEMPALACE_DIR/scripts/check_palace_health.sh" || true
     echo 'MemPalace: ready'
 else
-    echo 'MemPalace: not available, skipping (set MEMPALACE_BRIDGE_HOST_DIR and rebuild the container to enable it)'
+    echo 'MemPalace: not available, skipping (clone ~/git/mempalace-mcp-bridge on the host and rebuild the container to enable it)'
 fi
 ```
 
-> `uv sync` installs `mempalace` into the bridge venv **inside the container** — the `:ro` mount ensures no files are written back to the host repo.
+> Because the bridge is mounted `:ro`, `uv sync` must **not** try to create `.venv/` inside `/opt/mempalace-mcp-bridge`. `UV_PROJECT_ENVIRONMENT` redirects the environment to a writable path owned by the container user.
+>
 > `check_palace_health.sh` silently fixes ChromaDB incompatibilities
 > (see [troubleshooting.md#chromadb-version-incompatibility](troubleshooting.md#chromadb-version-incompatibility)).
 
@@ -158,8 +154,8 @@ VS Code Copilot will start the MCP server automatically when the chat is opened.
 
 | File | Change |
 |---|---|
-| `devcontainer.json` | Validation `initializeCommand` + `mounts` with `${localEnv:MEMPALACE_BRIDGE_HOST_DIR}` |
-| `post-create.sh` | Conditional block: `uv sync` + `check_palace_health.sh` |
+| `devcontainer.json` | Robust `initializeCommand` + readonly mount from `${localEnv:HOME}/git/mempalace-mcp-bridge` |
+| `post-create.sh` | Conditional block: `UV_PROJECT_ENVIRONMENT=... uv sync` + `check_palace_health.sh` |
 | `.vscode/mcp.json` | MCP server config with `env.MEMPALACE_PALACE_PATH` |
 
 ---
@@ -168,11 +164,10 @@ VS Code Copilot will start the MCP server automatically when the chat is opened.
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| `initializeCommand` fails: `MEMPALACE_BRIDGE_HOST_DIR is not set` | Variable not exported in the shell that launched VS Code | Add `export MEMPALACE_BRIDGE_HOST_DIR=/absolute/path/to/mempalace-mcp-bridge` to `~/.bashrc` or `~/.zshrc`, then launch VS Code from a terminal (`code .`) and rebuild |
-| VS Code cannot see `MEMPALACE_BRIDGE_HOST_DIR` | VS Code launched from the GUI — it does not inherit shell environment variables | Define the variable in `~/.bashrc` or `~/.zshrc`, then launch VS Code from a terminal (`code .`) |
-| `initializeCommand` fails: `does not exist` | Variable set but directory missing | Verify that `$MEMPALACE_BRIDGE_HOST_DIR` points to the root of the clone and that the clone is present |
-| `MemPalace: not available, skipping` | Empty mount — `pyproject.toml` missing | Verify that `MEMPALACE_BRIDGE_HOST_DIR` points to the repo root (not a subdirectory) |
-| Silently empty mount (Docker Desktop / WSL) | Windows path (`C:\...`) used instead of Linux path | Use the absolute Linux path (e.g. `/home/user/src/mempalace-mcp-bridge`) in `MEMPALACE_BRIDGE_HOST_DIR` |
+| `initializeCommand` fails because `HOME` is empty | `userEnvProbe` timed out or shell startup did not fully initialise the environment | Use `mkdir -p ${HOME:-$(echo ~)}/git/mempalace-mcp-bridge || true` so the command still resolves a host home directory |
+| `MemPalace: not available, skipping` | Empty mount — `pyproject.toml` missing | Verify that `~/git/mempalace-mcp-bridge` exists on the host and that the mount points to the repo root |
+| Bridge mount is empty in the container | `~/git/mempalace-mcp-bridge` is missing on the host or mounted from the wrong absolute path | Clone the bridge at `~/git/mempalace-mcp-bridge`, or replace the mount source with the correct absolute host path |
+| `uv sync` fails with a write or permission error under `/opt/mempalace-mcp-bridge` | The bridge repo is mounted read-only | Set `UV_PROJECT_ENVIRONMENT=/home/<container-user>/.venv/mempalace-mcp-bridge` before `uv sync` |
 | `"No palace found"` in MCP tools | Palace not mounted or `MEMPALACE_PALACE_PATH` missing/incorrect | Check the `~/.mempalace` bind mount and the `env.MEMPALACE_PALACE_PATH` key in `mcp.json` |
 | Palace present on host but empty in container | Incorrect `<container-user>` in the mount or in `MEMPALACE_PALACE_PATH` | Run `whoami` inside the container and fix both occurrences of `<container-user>` |
 | MCP server does not start | Incorrect `uv` path in `mcp.json` | Check with `which uv` in a devcontainer terminal and fix the `command` key |
