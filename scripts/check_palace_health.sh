@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # scripts/check_palace_health.sh
-# Detects and auto-repairs ChromaDB config_json_str incompatibilities.
+# Detects ChromaDB config_json_str incompatibilities and can auto-repair them.
 #
 # Background: ChromaDB >= 0.6.0 requires a _type field in config_json_str.
 # Palaces created with older versions store '{}' and fail with "No palace found".
-# This script detects that, backs up the SQLite file, and applies the fix in-place.
+# This script can either report the problem or, in repair mode, back up the SQLite
+# file and apply the fix in-place.
 #
 # Exit codes:
 #   0 — palace is healthy (or was successfully repaired)
@@ -17,6 +18,20 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV_PYTHON="$REPO_ROOT/.venv/bin/python"
+MODE="repair"
+
+case "${1:-}" in
+    ""|--repair)
+        ;;
+    --read-only)
+        MODE="read-only"
+        ;;
+    *)
+        echo "[FAIL]  Unknown option: ${1}" >&2
+        echo "        Use --repair or --read-only." >&2
+        exit 1
+        ;;
+esac
 
 warn()  { echo "[WARN]  $*"; }
 ok()    { echo "[OK]    $*"; }
@@ -27,8 +42,10 @@ if [ ! -f "$VENV_PYTHON" ]; then
     exit 1
 fi
 
-RESULT=$("$VENV_PYTHON" - 2>/dev/null <<'PYEOF'
+RESULT=$(
+PALACE_HEALTH_MODE="$MODE" "$VENV_PYTHON" - 2>/dev/null <<'PYEOF'
 import sys, json, sqlite3, shutil
+import os
 from pathlib import Path
 
 try:
@@ -42,6 +59,7 @@ except ImportError as e:
 cfg = MempalaceConfig()
 palace_path = cfg.palace_path
 db_path = Path(palace_path) / "chroma.sqlite3"
+mode = os.environ.get("PALACE_HEALTH_MODE", "repair")
 
 if not db_path.exists():
     print("NOTFOUND:")
@@ -61,6 +79,11 @@ except Exception as e:
 broken = [(row[0], row[1]) for row in rows if not json.loads(row[2] or "{}").get("_type")]
 
 if broken:
+    if mode == "read-only":
+        print(f"BROKEN:{','.join(name for _, name in broken)}")
+        conn.close()
+        sys.exit(1)
+
     # Back up the SQLite before any modification
     backup_path = str(db_path) + ".bak"
     shutil.copy2(str(db_path), backup_path)
@@ -99,6 +122,13 @@ case "$RESULT" in
         warn "See docs/troubleshooting.md#chromadb-version-incompatibility for details."
         ok "Palace repaired and accessible"
         exit 0
+        ;;
+    BROKEN:*)
+        NAMES="${RESULT#BROKEN:}"
+        fail_msg "Palace has a ChromaDB config incompatibility on collection(s): $NAMES"
+        fail_msg "Run: bash update.sh"
+        fail_msg "See docs/troubleshooting.md#chromadb-version-incompatibility"
+        exit 1
         ;;
     NOTFOUND:*)
         # Normal during a fresh install before init_palace.sh
