@@ -129,11 +129,11 @@ In `.vscode/mcp.json` of the devcontainer workspace:
     "mempalace": {
       "type": "stdio",
       "command": "/home/<container-user>/.local/bin/uv",
-      "args": [
-        "run",
-        "--directory", "/opt/mempalace-mcp-bridge",
-        "python", "-m", "mempalace.mcp_server"
-      ],
+       "args": [
+         "run",
+         "--directory", "/opt/mempalace-mcp-bridge",
+         "python", "scripts/run_mcp_server.py"
+       ],
       "env": {
         "MEMPALACE_PALACE_PATH": "/home/<container-user>/.mempalace/palace"
       }

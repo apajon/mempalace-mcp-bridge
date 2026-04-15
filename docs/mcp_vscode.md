@@ -26,7 +26,7 @@ Create or edit `.vscode/mcp.json` in your workspace:
     "mempalace": {
       "type": "stdio",
       "command": "/ABSOLUTE/PATH/TO/uv",
-      "args": ["run", "python", "-m", "mempalace.mcp_server"]
+      "args": ["run", "--directory", "/ABSOLUTE/PATH/TO/mempalace-mcp-bridge", "python", "scripts/run_mcp_server.py"]
     }
   }
 }
@@ -47,7 +47,7 @@ A ready-to-copy example is at `examples/mcp/vscode.mcp.json`.
 
 ## Working directory
 
-`uv run python -m mempalace.mcp_server` should be run from the directory where your MemPalace data was initialized. If your MCP client allows setting a `cwd`, set it to the repository root.
+`uv run --directory /ABSOLUTE/PATH/TO/mempalace-mcp-bridge python scripts/run_mcp_server.py` should be run from the repository root so the guarded launcher can enforce the supported ChromaDB line before starting `mempalace.mcp_server`.
 
 If not, ensure `mempalace init` was run in or near the workspace that the MCP client opens.
 

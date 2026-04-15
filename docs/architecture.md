@@ -33,7 +33,7 @@ Source files (Markdown, code, notes)
 Local vector store (~/.mempalace/ or configured path)
         │
         ▼
- python -m mempalace.mcp_server   ◄── launched by MCP client (auto-start)
+ python scripts/run_mcp_server.py ◄── guarded launcher started by MCP client
         │
         ▼
 MCP client (VS Code / Copilot Chat / other)
@@ -59,6 +59,7 @@ MCP client (VS Code / Copilot Chat / other)
 |---|---|
 | `uv` | Python environment and package manager |
 | `mempalace` CLI | Indexes files into local memory |
+| `scripts/run_mcp_server.py` | Enforces the supported ChromaDB line, then starts the MCP server |
 | `mempalace.mcp_server` | Exposes memory as MCP tools |
 | MCP client | Launches the server, sends tool calls |
 | LLM (remote) | Generates responses using memory context |
@@ -69,7 +70,7 @@ MCP client (VS Code / Copilot Chat / other)
 
 1. User opens a chat session in the MCP-compatible client
 2. Client reads `.vscode/mcp.json` (or equivalent config)
-3. Client launches `uv run python -m mempalace.mcp_server` as a subprocess
+3. Client launches `uv run --directory <repo> python scripts/run_mcp_server.py` as a subprocess
 4. Server starts in stdio mode and waits for MCP protocol messages
 5. When the user asks a question, the client may call `mempalace` tools
 6. Tools return relevant memory chunks

@@ -22,7 +22,8 @@ Then reload your VS Code window (`Ctrl+Shift+P` → **Developer: Reload Window**
 | Action | Notes |
 |--------|-------|
 | `git pull` | Pulls the latest changes from this repo |
-| Upgrades MemPalace in `.venv` | `uv pip install --upgrade "mempalace>=3.0.0" "chromadb<0.7"` |
+| Upgrades MemPalace in `.venv` | `uv pip install --upgrade "mempalace>=3.0.0" "chromadb>=0.6,<0.7"` |
+| Enforces supported ChromaDB line | Fails fast unless installed `chromadb` is on the tested `0.6.x` line |
 | Checks `.vscode/mcp.json` paths | Regenerates only if paths are wrong or stale |
 | Runs `verify.sh` | Confirms the full stack is still healthy |
 
@@ -50,7 +51,7 @@ already complete, including skipping MCP config regeneration if the paths are co
 | `uv` reinstalled to a different location | Same — stale command path is detected and fixed |
 | `.venv` partially broken | `verify.sh` fails; re-run `bash setup.sh` to repair |
 | MemPalace introduces breaking changes | `verify.sh` reports failures with actionable messages |
-| Latest `chromadb` release is incompatible with existing palaces | `update.sh` keeps Chroma on the tested `0.6.x` line automatically |
+| Latest `chromadb` release is incompatible with existing palaces | `update.sh` keeps Chroma on the tested `0.6.x` line and fails if the environment is outside it |
 | No internet access | Version staleness check is skipped silently; update still works |
 
 ---
@@ -69,12 +70,13 @@ Expected output:
 [PASS] uv found: /home/user/.local/bin/uv (uv 0.x.x)
 [PASS] Virtual environment found at .venv/
 [PASS] mempalace package importable
+[PASS] Installed chromadb 0.6.x is on the supported 0.6.x line
 [PASS] mempalace CLI responds
 [PASS] Sample notes found in examples/sample_notes/ (3 files)
 [PASS] VS Code MCP config present and populated (.vscode/mcp.json)
 [PASS] MCP server starts without error (exact command from .vscode/mcp.json)
 
- All 7 checks passed — you're ready to use MemPalace in VS Code!
+ All checks passed — you're ready to use MemPalace in VS Code!
 ```
 
 ---

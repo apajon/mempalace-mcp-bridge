@@ -143,7 +143,7 @@ Note that mining is additive — previously mined content may still be present.
 bash scripts/run_manual_mcp.sh
 
 # Or directly:
-.venv/bin/python -m mempalace.mcp_server
+uv run --python .venv/bin/python python scripts/run_mcp_server.py
 ```
 
 Check for Python tracebacks. Common causes:
@@ -192,17 +192,28 @@ Error executing plan: Error sending backfill request to compactor: Error reading
 This typically surfaces **after running `bash update.sh`** with an older bridge checkout
 or after manually upgrading the `chromadb` package.
 
+The stable `main` branch now hard-fails when installed `chromadb` is outside the supported
+`0.6.x` line instead of trying to continue on an untested version.
+
 **Automatic fix:**
 
 ```bash
 bash verify.sh
 ```
 
-`verify.sh` includes a palace health check (step 8) that detects the broken
+`verify.sh` includes a palace health check (step 9) that detects the broken
 `config_json_str`, creates a backup (`chroma.sqlite3.bak`), and repairs it automatically.
 
 This bridge now pins ChromaDB to the tested `0.6.x` line during setup and updates, so
 re-running the latest `bash update.sh` is the safest fix when this regression appears.
+
+If startup or verification now stops with an error like:
+
+```text
+[ERROR] unsupported chromadb 1.x.y. This stable branch supports 0.6.x only. Run: bash update.sh
+```
+
+that is the intended guardrail. This branch does not support ChromaDB `1.x`.
 
 **Manual fix** (if the scripts are unavailable):
 

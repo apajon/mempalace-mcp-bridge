@@ -60,11 +60,14 @@ This creates a `.venv/` directory in the current folder. It is excluded from ver
 ## 4. Install MemPalace
 
 ```bash
-uv pip install --python .venv/bin/python "mempalace>=3.0.0" "chromadb<0.7"
+uv pip install --python .venv/bin/python "mempalace>=3.0.0" "chromadb>=0.6,<0.7"
 ```
 
 This installs MemPalace and keeps ChromaDB on the tested `0.6.x` line, which avoids
 the `chromadb` 1.x database incompatibility with older palaces.
+
+The stable `main` branch assumes that contract explicitly and fails fast if the installed
+`chromadb` version is outside `0.6.x`.
 
 > MemPalace does not require an API key. It is a local tool.
 

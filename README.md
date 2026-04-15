@@ -19,13 +19,14 @@ This repo provides a plug-and-play bridge:
 - Auto-start — no terminal, VS Code handles everything
 - Mine your own files — query your notes, docs, and decisions
 - Built-in verification — `verify.sh` checks the environment, the generated MCP config, and that the MCP server actually starts
-- Palace safety checks — setup and update detect known ChromaDB compatibility issues and keep the bridge on the tested `0.6.x` line
+- Palace safety checks — setup, update, verify, and runtime startup reject unsupported `chromadb` versions and keep the bridge on the tested `0.6.x` line
 - Reusable across environments with a shared palace
 
 > **Compatibility status**
-> This bridge currently targets the tested ChromaDB `0.6.x` line (`chromadb<0.7`).
+> This bridge currently targets the tested ChromaDB `0.6.x` line (`chromadb>=0.6,<0.7`).
 > This is intentional: newer ChromaDB `1.x` releases can break older MemPalace palaces.
 > If you already rely on existing palaces, this repo prioritizes stability over latest-package tracking.
+> `main` fails fast when the installed `chromadb` version is outside that supported line.
 
 ---
 
@@ -106,6 +107,7 @@ Then ask Copilot about anything in those files.
 ## Known limitations
 
 - This bridge currently targets ChromaDB `0.6.x`, not ChromaDB `1.x`
+- `main` hard-fails outside the supported `chromadb>=0.6,<0.7` range
 - Existing palaces are preserved, but automatic migration to ChromaDB `1.x` is not supported here
 - Linux / WSL2 is the tested path today
 - Copilot behavior remains probabilistic even with MemPalace as the preferred context source
@@ -162,7 +164,7 @@ This repo includes patterns for:
 - Linux (tested on Ubuntu 24.04 via WSL2)
 - VS Code with [GitHub Copilot Chat](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot-chat)
 - `curl` required (`setup.sh` uses it to install `uv`)
-- ChromaDB `0.6.x` line pinned intentionally via `chromadb<0.7`
+- ChromaDB `0.6.x` line pinned intentionally via `chromadb>=0.6,<0.7`
 
 `setup.sh` installs `uv` and Python 3.12 automatically.
 
