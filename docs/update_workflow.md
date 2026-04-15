@@ -52,7 +52,7 @@ already complete, including skipping MCP config regeneration if the paths are co
 | `.venv` partially broken | `verify.sh` fails; re-run `bash setup.sh` to repair |
 | MemPalace introduces breaking changes | `verify.sh` reports failures with actionable messages |
 | Latest `chromadb` release is incompatible with existing palaces | `update.sh` keeps Chroma on the tested `0.6.x` line and fails if the environment is outside it |
-| No internet access | Version staleness check is skipped silently; update still works |
+| Palace was created under a different environment | `verify.sh` reports manifest drift as a warning so you can review the mismatch before trusting the palace |
 
 ---
 
@@ -64,19 +64,29 @@ Run at any time to confirm the full stack is healthy:
 bash verify.sh
 ```
 
-Expected output:
+`verify.sh` now classifies the result instead of only printing pass/fail lines:
+
+- **SUPPORTED and healthy** — all checks passed with no drift detected
+- **SUPPORTED but suspicious** — the bridge is still supported, but something no longer matches cleanly
+- **UNSUPPORTED or unsafe** — the bridge should not be trusted until the failures are fixed
+
+Healthy example:
 
 ```
 [PASS] uv found: /home/user/.local/bin/uv (uv 0.x.x)
 [PASS] Virtual environment found at .venv/
-[PASS] mempalace package importable
-[PASS] Installed chromadb 0.6.x is on the supported 0.6.x line
+[PASS] Python 3.12.x in .venv is on the tested 3.12 line
+[PASS] mempalace 3.x.y is importable
+[PASS] chromadb 0.6.x is on the supported 0.6.x line
 [PASS] mempalace CLI responds
 [PASS] Sample notes found in examples/sample_notes/ (3 files)
-[PASS] VS Code MCP config present and populated (.vscode/mcp.json)
-[PASS] MCP server starts without error (exact command from .vscode/mcp.json)
+[PASS] VS Code MCP config points to the guarded launcher (.vscode/mcp.json)
+[PASS] MCP server starts and stays alive with the exact VS Code launch command
+[PASS] Palace is readable
+[PASS] Palace manifest exists and matches the active environment
+[PASS] Palace path is outside container-local filesystems (~/.mempalace/palace)
 
- All checks passed — you're ready to use MemPalace in VS Code!
+ Result: SUPPORTED and healthy
 ```
 
 ---

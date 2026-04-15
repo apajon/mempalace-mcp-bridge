@@ -18,7 +18,7 @@ This repo provides a plug-and-play bridge:
 - Fully local — no cloud, no API key, no Docker
 - Auto-start — no terminal, VS Code handles everything
 - Mine your own files — query your notes, docs, and decisions
-- Built-in verification — `verify.sh` checks the environment, the generated MCP config, and that the MCP server actually starts
+- Built-in verification — `verify.sh` classifies the bridge as healthy, suspicious, or unsafe by checking the environment, the generated MCP config, real MCP startup, and palace manifest drift
 - Palace safety checks — setup, update, verify, and runtime startup reject unsupported `chromadb` versions and keep the bridge on the tested `0.6.x` line
 - Palace manifest — setup writes `mempalace-bridge-manifest.json` into the palace root for version traceability
 - Reusable across environments with a shared palace
@@ -70,6 +70,12 @@ Optionally verify the generated setup before opening Copilot Chat:
 ```bash
 bash verify.sh
 ```
+
+`verify.sh` is intentionally narrow. It checks the pinned Python/Chroma environment, the installed MemPalace version, `.vscode/mcp.json` integrity, real MCP startup, palace readability, and whether the palace manifest still matches the active environment. The summary is one of:
+
+- **SUPPORTED and healthy** — all checks passed
+- **SUPPORTED but suspicious** — the bridge still works, but drift was detected and should be reviewed
+- **UNSUPPORTED or unsafe** — do not rely on the bridge until the failures are fixed
 
 ---
 
