@@ -41,7 +41,7 @@ fi
 # ─── Install MemPalace ────────────────────────────────────────────────────────
 
 info "Installing MemPalace..."
-uv pip install --python "$VENV_DIR/bin/python" mempalace
+uv pip install --python "$VENV_DIR/bin/python" "mempalace>=3.0.0" "chromadb<0.7"
 
 # Verify
 if uv run --python "$VENV_DIR/bin/python" mempalace --version &>/dev/null 2>&1 || \

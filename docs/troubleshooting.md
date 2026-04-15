@@ -183,8 +183,14 @@ an empty JSON object (`{}`), but the new version expects a `_type` field
 (`"CollectionConfigurationInternal"`). Without it, ChromaDB raises a `KeyError` during
 startup, and MemPalace silently returns `"No palace found"`.
 
-This typically surfaces **after running `bash update.sh`** or after manually upgrading
-the `chromadb` package.
+More recently, `chromadb` 1.x can also break older palaces during startup with errors like:
+
+```text
+Error executing plan: Error sending backfill request to compactor: Error reading from metadata segment reader: error occurred while decoding column 0: mismatched types; Rust type `u64` (as SQL type `INTEGER`) is not compatible with SQL type `BLOB`
+```
+
+This typically surfaces **after running `bash update.sh`** with an older bridge checkout
+or after manually upgrading the `chromadb` package.
 
 **Automatic fix:**
 
@@ -195,7 +201,8 @@ bash verify.sh
 `verify.sh` includes a palace health check (step 8) that detects the broken
 `config_json_str`, creates a backup (`chroma.sqlite3.bak`), and repairs it automatically.
 
-`update.sh` also runs this check after every upgrade, so future updates are safe.
+This bridge now pins ChromaDB to the tested `0.6.x` line during setup and updates, so
+re-running the latest `bash update.sh` is the safest fix when this regression appears.
 
 **Manual fix** (if the scripts are unavailable):
 

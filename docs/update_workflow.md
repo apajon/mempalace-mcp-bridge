@@ -22,7 +22,7 @@ Then reload your VS Code window (`Ctrl+Shift+P` → **Developer: Reload Window**
 | Action | Notes |
 |--------|-------|
 | `git pull` | Pulls the latest changes from this repo |
-| Upgrades MemPalace in `.venv` | `uv pip install --upgrade mempalace` |
+| Upgrades MemPalace in `.venv` | `uv pip install --upgrade "mempalace>=3.0.0" "chromadb<0.7"` |
 | Checks `.vscode/mcp.json` paths | Regenerates only if paths are wrong or stale |
 | Runs `verify.sh` | Confirms the full stack is still healthy |
 
@@ -50,6 +50,7 @@ already complete, including skipping MCP config regeneration if the paths are co
 | `uv` reinstalled to a different location | Same — stale command path is detected and fixed |
 | `.venv` partially broken | `verify.sh` fails; re-run `bash setup.sh` to repair |
 | MemPalace introduces breaking changes | `verify.sh` reports failures with actionable messages |
+| Latest `chromadb` release is incompatible with existing palaces | `update.sh` keeps Chroma on the tested `0.6.x` line automatically |
 | No internet access | Version staleness check is skipped silently; update still works |
 
 ---

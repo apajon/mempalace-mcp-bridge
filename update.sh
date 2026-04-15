@@ -76,7 +76,7 @@ if ! command -v uv &>/dev/null; then
     fail "uv not found. Run: bash setup.sh to restore the environment."
 fi
 
-uv pip install --upgrade --python "$VENV_PYTHON" mempalace
+uv pip install --upgrade --python "$VENV_PYTHON" "mempalace>=3.0.0" "chromadb<0.7"
 ok "MemPalace upgraded"
 
 # ─── 2b. Palace health check after upgrade ───────────────────────────────────
