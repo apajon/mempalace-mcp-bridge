@@ -67,6 +67,33 @@ Because of that, the detector does **not** infer `chroma_1_x` from structure alo
 .venv/bin/python scripts/palace_format_detector.py ~/.mempalace/palace --pretty
 ```
 
+## Stable safety gate
+
+The stable bridge now uses a narrow safety gate before risky palace operations.
+
+Guarded flows:
+
+- `scripts/init_palace.sh`
+- `scripts/mine_sample_data.sh`
+- `scripts/check_palace_health.sh`
+- `scripts/run_mcp_server.py`
+- `verify.sh` (before palace health/open checks)
+
+Policy on the stable path:
+
+- `chroma_0_6` → allowed
+- `chroma_1_x` → blocked
+- `unknown` → blocked
+
+Examples:
+
+```bash
+python3 scripts/palace_safety_gate.py --action read ~/.mempalace/palace
+python3 scripts/palace_safety_gate.py --action write ~/.mempalace/palace
+```
+
+The gate does not migrate, repair, or retry with another runtime. It only decides whether the stable bridge should proceed.
+
 ## Example outputs
 
 ### Manifest-backed `0.6.x`
