@@ -42,6 +42,19 @@ if [ ! -f "$VENV_PYTHON" ]; then
     exit 1
 fi
 
+GATE_ACTION="repair"
+if [ "$MODE" = "read-only" ]; then
+    GATE_ACTION="read"
+fi
+
+GATE_OUTPUT=""
+GATE_EXIT=0
+GATE_OUTPUT=$("$VENV_PYTHON" "$REPO_ROOT/scripts/palace_safety_gate.py" --action "$GATE_ACTION" 2>&1) || GATE_EXIT=$?
+if [ "$GATE_EXIT" -ne 0 ]; then
+    printf '%s\n' "$GATE_OUTPUT" >&2
+    exit 1
+fi
+
 RESULT=$(
 PALACE_HEALTH_MODE="$MODE" "$VENV_PYTHON" - 2>/dev/null <<'PYEOF'
 import sys, json, sqlite3, shutil
