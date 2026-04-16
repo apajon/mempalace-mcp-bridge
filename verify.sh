@@ -11,7 +11,8 @@ set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VENV_PYTHON="$REPO_ROOT/.venv/bin/python"
-MCP_CONFIG="$REPO_ROOT/.vscode/mcp.json"
+MCP_CONFIG="$REPO_ROOT/.mcp.json"
+LEGACY_MCP_CONFIG="$REPO_ROOT/.vscode/mcp.json"
 PYTHON_PIN_FILE="$REPO_ROOT/.python-version"
 SUPPORTED_CHROMA_LINE="0.6.x"
 
@@ -251,7 +252,7 @@ else
     fail "Sample notes missing in $NOTES_DIR"
 fi
 
-# ─── 8. VS Code MCP config integrity ────────────────────────────────────────────
+# ─── 8. Workspace MCP config integrity ─────────────────────────────────────────
 
 MCP_CONFIG_OK=false
 MCP_COMMAND=""
@@ -260,13 +261,16 @@ MCP_PARSE_ERROR=""
 MCP_TYPE=""
 
 if [ ! -f "$MCP_CONFIG" ]; then
-    fail "VS Code MCP config missing at $MCP_CONFIG"
+    fail "Workspace MCP config missing at $MCP_CONFIG"
     detail "Run: bash setup.sh"
+    if [ -f "$LEGACY_MCP_CONFIG" ]; then
+        detail "Or migrate the legacy config: jq '{mcpServers: .servers}' .vscode/mcp.json > .mcp.json"
+    fi
 elif grep -q "ABSOLUTE/PATH" "$MCP_CONFIG" 2>/dev/null; then
-    fail "VS Code MCP config still contains placeholder paths"
+    fail "Workspace MCP config still contains placeholder paths"
     detail "Run: bash setup.sh"
 elif [ ! -f "$VENV_PYTHON" ]; then
-    fail "VS Code MCP config could not be validated because .venv is missing"
+    fail "Workspace MCP config could not be validated because .venv is missing"
 else
     MCP_INFO="$("$VENV_PYTHON" - <<PYEOF 2>/dev/null || true
 import json
@@ -282,14 +286,14 @@ except Exception as exc:
     print(f"parse_error\t{exc}")
     raise SystemExit(0)
 
-servers = cfg.get("servers")
-if not isinstance(servers, dict):
-    print("parse_error\tmissing 'servers' object")
+mcp_servers = cfg.get("mcpServers")
+if not isinstance(mcp_servers, dict):
+    print("parse_error\tmissing 'mcpServers' object")
     raise SystemExit(0)
 
-server = servers.get("mempalace")
+server = mcp_servers.get("mempalace")
 if not isinstance(server, dict):
-    print("parse_error\tmissing 'servers.mempalace' object")
+    print("parse_error\tmissing 'mcpServers.mempalace' object")
     raise SystemExit(0)
 
 print(f"type\t{server.get('type', '')}")
@@ -309,33 +313,33 @@ PYEOF
     done <<< "$MCP_INFO"
 
     if [ -n "$MCP_PARSE_ERROR" ]; then
-        fail "VS Code MCP config is invalid"
+        fail "Workspace MCP config is invalid"
         detail "Reason: $MCP_PARSE_ERROR"
         detail "Run: bash setup.sh"
     elif [ "$MCP_TYPE" != "stdio" ]; then
-        fail "VS Code MCP config must use a stdio server"
+        fail "Workspace MCP config must use a stdio server"
         detail "Run: bash setup.sh"
     elif [ -z "$MCP_COMMAND" ]; then
-        fail "VS Code MCP config is missing the launch command"
+        fail "Workspace MCP config is missing the launch command"
         detail "Run: bash setup.sh"
     elif [[ "$MCP_COMMAND" != /* ]]; then
-        fail "VS Code MCP config must use an absolute uv path"
+        fail "Workspace MCP config must use an absolute uv path"
         detail "Current command: $MCP_COMMAND"
         detail "Run: bash setup.sh"
     elif [ ! -x "$MCP_COMMAND" ]; then
-        fail "VS Code MCP config points to a missing or non-executable uv binary"
+        fail "Workspace MCP config points to a missing or non-executable uv binary"
         detail "Current command: $MCP_COMMAND"
         detail "Run: bash setup.sh"
     elif [ "$MCP_ARGS_JSON" != "$EXPECTED_ARGS_JSON" ]; then
-        fail "VS Code MCP config does not use the guarded launcher command"
+        fail "Workspace MCP config does not use the guarded launcher command"
         detail "Expected: uv run --directory $REPO_ROOT python scripts/run_mcp_server.py"
         detail "Run: bash setup.sh"
     else
-        pass "VS Code MCP config points to the guarded launcher ($MCP_CONFIG)"
+        pass "Workspace MCP config points to the guarded launcher ($MCP_CONFIG)"
         MCP_CONFIG_OK=true
 
         if [ -n "$EXPECTED_UV" ] && [ "$MCP_COMMAND" != "$EXPECTED_UV" ]; then
-            warn "VS Code MCP config uses a different uv path than the active shell"
+            warn "Workspace MCP config uses a different uv path than the active shell"
             detail "Config: $MCP_COMMAND"
             detail "Shell:  $EXPECTED_UV"
             detail "If this drift is unintended, run: bash setup.sh"
@@ -343,7 +347,7 @@ PYEOF
     fi
 fi
 
-# ─── 9. MCP server startup (exact VS Code command) ─────────────────────────────
+# ─── 9. MCP server startup (exact workspace command) ──────────────────────────
 
 if [ "$MCP_CONFIG_OK" = true ]; then
     MCP_LAUNCH_LOG="$TMPDIR/mcp-launch.log"
@@ -352,11 +356,11 @@ if [ "$MCP_CONFIG_OK" = true ]; then
     sleep 2
 
     if kill -0 "$SERVER_PID" 2>/dev/null; then
-        pass "MCP server starts and stays alive with the exact VS Code launch command"
+        pass "MCP server starts and stays alive with the exact workspace launch command"
         kill "$SERVER_PID" 2>/dev/null
         wait "$SERVER_PID" 2>/dev/null || true
     else
-        fail "MCP server exited immediately when launched from .vscode/mcp.json"
+        fail "MCP server exited immediately when launched from .mcp.json"
         STARTUP_DIAG="$(grep -v '^[[:space:]]*$' "$MCP_LAUNCH_LOG" | head -n 3 || true)"
         if [ -n "$STARTUP_DIAG" ]; then
             while IFS= read -r line; do

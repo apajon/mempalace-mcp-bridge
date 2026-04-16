@@ -2,7 +2,7 @@
 # run.sh
 # Starts the MemPalace MCP server in stdio mode.
 #
-# In normal usage VS Code launches this automatically via .vscode/mcp.json.
+# In normal usage Copilot launches this automatically via .mcp.json.
 # Use this script only as a fallback or to test that the server starts correctly.
 #
 # Keep the terminal open while using Copilot Chat.

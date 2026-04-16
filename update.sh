@@ -6,14 +6,14 @@
 # What it does:
 #   1. Pulls the latest commits from this repo
 #   2. Upgrades MemPalace inside the existing .venv
-#   3. Re-checks that .vscode/mcp.json still has correct paths
+#   3. Re-checks that .mcp.json still has correct paths
 #      (regenerates it if the repo was moved or paths changed)
 #   4. Runs verify.sh to confirm everything is healthy
 #
 # What it does NOT do:
 #   - Never touches ~/.mempalace/palace (your notes and memories)
 #   - Never deletes .venv and reinstalls from scratch
-#   - Never overwrites .vscode/mcp.json unless the paths inside are wrong
+#   - Never overwrites .mcp.json unless the paths inside are wrong
 
 set -euo pipefail
 
@@ -92,16 +92,47 @@ if [ "$HEALTH_EXIT" -eq 1 ]; then
     exit 1
 fi
 
-# ─── 3. Revalidate .vscode/mcp.json ──────────────────────────────────────────
+# ─── 3. Revalidate .mcp.json ────────────────────────────────────────────────
 #
 # The config embeds absolute paths (uv binary + repo root).
 # If the repo was moved, or uv was reinstalled elsewhere, those paths are stale.
 # Detect that and regenerate rather than silently leaving a broken config.
 
-info "Step 3/4 — Checking .vscode/mcp.json..."
+info "Step 3/4 — Checking .mcp.json..."
 
-MCP_CONFIG="$REPO_ROOT/.vscode/mcp.json"
+MCP_CONFIG="$REPO_ROOT/.mcp.json"
+LEGACY_MCP_CONFIG="$REPO_ROOT/.vscode/mcp.json"
 NEEDS_REGEN=false
+
+if [ ! -f "$MCP_CONFIG" ] && [ -f "$LEGACY_MCP_CONFIG" ]; then
+    info "Legacy MCP config found at .vscode/mcp.json — migrating to .mcp.json."
+    if "$VENV_PYTHON" - <<PYEOF >/dev/null 2>&1
+import json
+from pathlib import Path
+
+legacy_path = Path(r"$LEGACY_MCP_CONFIG")
+target_path = Path(r"$MCP_CONFIG")
+
+with legacy_path.open("r", encoding="utf-8") as handle:
+    cfg = json.load(handle)
+
+servers = cfg.pop("servers", None)
+if not isinstance(servers, dict):
+    raise SystemExit(1)
+
+cfg["mcpServers"] = servers
+
+with target_path.open("w", encoding="utf-8") as handle:
+    json.dump(cfg, handle, indent=2)
+    handle.write("\n")
+PYEOF
+    then
+        ok "Legacy MCP config migrated to $MCP_CONFIG"
+    else
+        warn "Legacy MCP config could not be migrated cleanly — will regenerate .mcp.json."
+        NEEDS_REGEN=true
+    fi
+fi
 
 if [ ! -f "$MCP_CONFIG" ]; then
     info "MCP config not found — will generate."
@@ -116,7 +147,7 @@ import json, sys
 try:
     with open('$MCP_CONFIG') as f:
         cfg = json.load(f)
-    args = cfg['servers']['mempalace'].get('args', [])
+    args = cfg['mcpServers']['mempalace'].get('args', [])
     idx = args.index('--directory') if '--directory' in args else -1
     print(args[idx + 1] if idx >= 0 else '')
 except Exception:
@@ -125,7 +156,7 @@ except Exception:
 
     if [ "$STORED_DIR" != "$REPO_ROOT" ]; then
         warn "MCP config points to '$STORED_DIR' but repo is now at '$REPO_ROOT'."
-        warn "Regenerating .vscode/mcp.json with correct paths."
+        warn "Regenerating .mcp.json with correct paths."
         NEEDS_REGEN=true
     else
         # Also verify the uv command path stored in the config actually exists
@@ -134,7 +165,7 @@ import json
 try:
     with open('$MCP_CONFIG') as f:
         cfg = json.load(f)
-    print(cfg['servers']['mempalace'].get('command', ''))
+    print(cfg['mcpServers']['mempalace'].get('command', ''))
 except Exception:
     print('')
 " 2>/dev/null || true)
@@ -143,7 +174,7 @@ import json
 try:
     with open('$MCP_CONFIG') as f:
         cfg = json.load(f)
-    print(json.dumps(cfg['servers']['mempalace'].get('args', [])))
+    print(json.dumps(cfg['mcpServers']['mempalace'].get('args', [])))
 except Exception:
     print('')
 " 2>/dev/null || true)
@@ -163,10 +194,9 @@ if [ "$NEEDS_REGEN" = true ]; then
     UV_PATH="$(command -v uv 2>/dev/null || true)"
     [ -n "$UV_PATH" ] || fail "uv not found — cannot regenerate MCP config."
 
-    mkdir -p "$REPO_ROOT/.vscode"
     cat > "$MCP_CONFIG" <<EOF
 {
-  "servers": {
+  "mcpServers": {
     "mempalace": {
       "type": "stdio",
       "command": "$UV_PATH",
