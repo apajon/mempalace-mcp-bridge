@@ -6,8 +6,14 @@ import argparse
 import hashlib
 import importlib.metadata
 import json
+import os
+import queue
+import shutil
 import sqlite3
+import subprocess
 import sys
+import threading
+import time
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
@@ -20,12 +26,14 @@ EXPORT_MANIFEST_FILENAME = "reconstruction-export-manifest.json"
 DRAWERS_FILENAME = "drawers.jsonl"
 TARGET_MANIFEST_FILENAME = "reconstruction-target-manifest.json"
 RETRIEVAL_QUERIES_FILENAME = "reconstruction-retrieval-queries.json"
+USAGE_SCENARIOS_FILENAME = "reconstruction-usage-scenarios.json"
 BUNDLE_TYPE = "mempalace_reconstruction_bundle"
 COLLECTION_NAME = "mempalace_drawers"
 DEFAULT_COLLECTION_METADATA = {"hnsw:space": "cosine"}
 EXPORT_FORMAT_VERSION = 1
 TARGET_FORMAT_VERSION = 1
 RETRIEVAL_FORMAT_VERSION = 1
+USAGE_FORMAT_VERSION = 1
 SAMPLE_ID_COUNT = 10
 DIAGNOSTIC_PREVIEW_COUNT = 5
 CONTENT_LENGTH_BUCKETS = (
@@ -41,6 +49,15 @@ RETRIEVAL_QUERY_CHAR_LIMIT = 80
 RETRIEVAL_TOP_K = 5
 RETRIEVAL_COUNT_TOLERANCE = 1
 RETRIEVAL_MIN_OVERLAP_RATIO = 0.4
+USAGE_TOP_K = 5
+USAGE_COUNT_TOLERANCE = 1
+USAGE_MIN_OVERLAP_RATIO = 0.4
+USAGE_ACCEPTABLE = "acceptable"
+USAGE_DEGRADED = "degraded"
+USAGE_UNUSABLE = "unusable"
+MCP_PROTOCOL_VERSION = "2025-11-25"
+MCP_REQUEST_TIMEOUT_SECONDS = 10.0
+MCP_STARTUP_GRACE_SECONDS = 1.0
 
 
 def _iso_timestamp_now() -> str:
@@ -56,6 +73,19 @@ def _load_package_version(package_name: str) -> str | None:
 
 def _source_db_path(source_palace: Path) -> Path:
     return source_palace / "chroma.sqlite3"
+
+
+def _resolve_uv_path() -> str | None:
+    uv_path = shutil.which("uv")
+    if uv_path:
+        return uv_path
+
+    home = Path.home()
+    for candidate in (home / ".cargo/bin/uv", home / ".local/bin/uv"):
+        if candidate.exists() and os.access(candidate, os.X_OK):
+            return str(candidate)
+
+    return None
 
 
 def _normalize_sqlite_metadata_value(row: sqlite3.Row) -> Any:
@@ -206,10 +236,13 @@ def _normalize_bundle_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
         files = {
             "drawers": DRAWERS_FILENAME,
             "retrieval_queries": RETRIEVAL_QUERIES_FILENAME,
+            "usage_scenarios": USAGE_SCENARIOS_FILENAME,
         }
     if not isinstance(files, dict):
         raise RuntimeError("Export manifest files must be a JSON object")
-    for required_file in ("drawers", "retrieval_queries"):
+    if "usage_scenarios" not in files:
+        files["usage_scenarios"] = USAGE_SCENARIOS_FILENAME
+    for required_file in ("drawers", "retrieval_queries", "usage_scenarios"):
         file_value = files.get(required_file)
         if not isinstance(file_value, str) or not _is_safe_bundle_relative_path(file_value):
             raise RuntimeError(
@@ -281,6 +314,32 @@ def _normalize_bundle_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
         "query_count": query_count,
         "top_k": top_k,
         "legacy_defaulted": retrieval_validation_defaulted,
+    }
+
+    usage_validation = normalized.get("usage_validation")
+    usage_validation_defaulted = usage_validation is None
+    if usage_validation is None:
+        usage_validation = {
+            "scenarios_file": files["usage_scenarios"],
+            "scenario_count": 0,
+            "top_k": USAGE_TOP_K,
+        }
+    if not isinstance(usage_validation, dict):
+        raise RuntimeError("Export manifest usage_validation must be a JSON object")
+    scenarios_file = usage_validation.get("scenarios_file", files["usage_scenarios"])
+    if not isinstance(scenarios_file, str) or not _is_safe_bundle_relative_path(scenarios_file):
+        raise RuntimeError("Export manifest usage_validation.scenarios_file must be a safe relative bundle path")
+    scenario_count = usage_validation.get("scenario_count")
+    if not isinstance(scenario_count, int) or scenario_count < 0:
+        raise RuntimeError("Export manifest usage_validation.scenario_count must be a non-negative integer")
+    usage_top_k = usage_validation.get("top_k")
+    if not isinstance(usage_top_k, int) or usage_top_k <= 0:
+        raise RuntimeError("Export manifest usage_validation.top_k must be a positive integer")
+    normalized["usage_validation"] = {
+        "scenarios_file": scenarios_file,
+        "scenario_count": scenario_count,
+        "top_k": usage_top_k,
+        "legacy_defaulted": usage_validation_defaulted,
     }
 
     warnings = normalized.get("warnings", [])
@@ -378,12 +437,7 @@ def _analyze_drawers(drawers: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def build_retrieval_query_plan(
-    drawers: list[dict[str, Any]],
-    *,
-    max_queries: int = RETRIEVAL_QUERY_COUNT,
-    top_k: int = RETRIEVAL_TOP_K,
-) -> dict[str, Any]:
+def _build_query_candidates(drawers: list[dict[str, Any]]) -> list[dict[str, Any]]:
     analysis = _analyze_drawers(drawers)
     metadata_by_id = analysis["indexes"]["metadata_by_id"]
     documents_by_id = analysis["indexes"]["documents_by_id"]
@@ -403,9 +457,21 @@ def build_retrieval_query_plan(
                 "query_text": query_text,
                 "wing": str(metadata.get("wing", "?")),
                 "room": str(metadata.get("room", "?")),
+                "document": document,
                 "document_preview": document[:RETRIEVAL_QUERY_CHAR_LIMIT],
             }
         )
+
+    return candidates
+
+
+def build_retrieval_query_plan(
+    drawers: list[dict[str, Any]],
+    *,
+    max_queries: int = RETRIEVAL_QUERY_COUNT,
+    top_k: int = RETRIEVAL_TOP_K,
+) -> dict[str, Any]:
+    candidates = _build_query_candidates(drawers)
 
     selected: list[dict[str, Any]] = []
     used_ids: set[str] = set()
@@ -451,6 +517,116 @@ def build_retrieval_query_plan(
         "created_at": _iso_timestamp_now(),
         "top_k": top_k,
         "queries": queries,
+    }
+
+
+def _make_multi_step_broad_query(query_text: str) -> str:
+    words = query_text.split()
+    if len(words) <= 1:
+        return query_text
+
+    broad_word_count = max(1, min(4, len(words) - 1))
+    return " ".join(words[:broad_word_count])
+
+
+def _make_copilot_style_prompt(candidate: dict[str, Any]) -> str:
+    query_text = candidate["query_text"]
+    wing = candidate["wing"]
+    room = candidate["room"]
+    if wing != "?" or room != "?":
+        return f"I need context about {query_text}. Focus on wing {wing} room {room}."
+    return f"I need context about {query_text}. Summarize the most relevant stored notes."
+
+
+def build_usage_scenario_plan(
+    drawers: list[dict[str, Any]],
+    *,
+    top_k: int = USAGE_TOP_K,
+) -> dict[str, Any]:
+    candidates = sorted(_build_query_candidates(drawers), key=lambda item: (item["wing"], item["room"], item["id"]))
+    if not candidates:
+        return {
+            "format_version": USAGE_FORMAT_VERSION,
+            "created_at": _iso_timestamp_now(),
+            "top_k": top_k,
+            "scenarios": [],
+        }
+
+    scenarios: list[dict[str, Any]] = []
+    simple_candidates = candidates[: min(2, len(candidates))]
+    multi_candidates = candidates[: min(2, len(candidates))]
+    copilot_candidate = candidates[min(2, len(candidates) - 1)]
+
+    for index, candidate in enumerate(simple_candidates, start=1):
+        scenarios.append(
+            {
+                "scenario_id": f"usage-{len(scenarios) + 1:03d}",
+                "scenario_type": "simple_query",
+                "anchor_id": candidate["id"],
+                "wing": candidate["wing"],
+                "room": candidate["room"],
+                "document_preview": candidate["document_preview"],
+                "selection_reason": f"simple_query_representative_{index}",
+                "steps": [
+                    {
+                        "step_id": "step-001",
+                        "query_text": candidate["query_text"],
+                        "purpose": "simple_lookup",
+                    }
+                ],
+            }
+        )
+
+    for index, candidate in enumerate(multi_candidates, start=1):
+        broad_query = _make_multi_step_broad_query(candidate["query_text"])
+        scenarios.append(
+            {
+                "scenario_id": f"usage-{len(scenarios) + 1:03d}",
+                "scenario_type": "multi_step_retrieval",
+                "anchor_id": candidate["id"],
+                "wing": candidate["wing"],
+                "room": candidate["room"],
+                "document_preview": candidate["document_preview"],
+                "selection_reason": f"multi_step_representative_{index}",
+                "steps": [
+                    {
+                        "step_id": "step-001",
+                        "query_text": broad_query,
+                        "purpose": "initial_lookup",
+                    },
+                    {
+                        "step_id": "step-002",
+                        "query_text": candidate["query_text"],
+                        "purpose": "refined_lookup",
+                    },
+                ],
+            }
+        )
+
+    scenarios.append(
+        {
+            "scenario_id": f"usage-{len(scenarios) + 1:03d}",
+            "scenario_type": "copilot_prompt",
+            "anchor_id": copilot_candidate["id"],
+            "wing": copilot_candidate["wing"],
+            "room": copilot_candidate["room"],
+            "document_preview": copilot_candidate["document_preview"],
+            "selection_reason": "copilot_style_prompt",
+            "steps": [
+                {
+                    "step_id": "step-001",
+                    "query_text": _make_copilot_style_prompt(copilot_candidate),
+                    "purpose": "copilot_style_lookup",
+                }
+            ],
+        }
+    )
+
+    return {
+        "format_version": USAGE_FORMAT_VERSION,
+        "created_at": _iso_timestamp_now(),
+        "top_k": top_k,
+        "scenarios": scenarios,
     }
 
 
@@ -804,6 +980,9 @@ def export_drawers(source_palace: Path, export_dir: Path) -> dict[str, Any]:
     retrieval_queries = build_retrieval_query_plan(drawers)
     if not retrieval_queries["queries"]:
         raise RuntimeError("Refusing export: could not build any deterministic retrieval validation queries")
+    usage_scenarios = build_usage_scenario_plan(drawers)
+    if not usage_scenarios["scenarios"]:
+        raise RuntimeError("Refusing export: could not build any deterministic usage scenarios")
     export_dir.mkdir(parents=True, exist_ok=False)
 
     manifest = {
@@ -813,6 +992,7 @@ def export_drawers(source_palace: Path, export_dir: Path) -> dict[str, Any]:
         "files": {
             "drawers": DRAWERS_FILENAME,
             "retrieval_queries": RETRIEVAL_QUERIES_FILENAME,
+            "usage_scenarios": USAGE_SCENARIOS_FILENAME,
         },
         "collection": {
             "name": COLLECTION_NAME,
@@ -845,6 +1025,11 @@ def export_drawers(source_palace: Path, export_dir: Path) -> dict[str, Any]:
             "query_count": len(retrieval_queries["queries"]),
             "top_k": retrieval_queries["top_k"],
         },
+        "usage_validation": {
+            "scenarios_file": USAGE_SCENARIOS_FILENAME,
+            "scenario_count": len(usage_scenarios["scenarios"]),
+            "top_k": usage_scenarios["top_k"],
+        },
     }
 
     with (export_dir / EXPORT_MANIFEST_FILENAME).open("w", encoding="utf-8") as handle:
@@ -858,6 +1043,10 @@ def export_drawers(source_palace: Path, export_dir: Path) -> dict[str, Any]:
 
     with (export_dir / RETRIEVAL_QUERIES_FILENAME).open("w", encoding="utf-8") as handle:
         json.dump(retrieval_queries, handle, indent=2)
+        handle.write("\n")
+
+    with (export_dir / USAGE_SCENARIOS_FILENAME).open("w", encoding="utf-8") as handle:
+        json.dump(usage_scenarios, handle, indent=2)
         handle.write("\n")
 
     return manifest
@@ -951,6 +1140,229 @@ def load_retrieval_query_plan_from_bundle(export_dir: Path, manifest: dict[str, 
     return query_plan
 
 
+def load_usage_scenario_plan(scenarios_path: Path) -> dict[str, Any]:
+    if not scenarios_path.exists():
+        raise RuntimeError(f"Usage scenarios file is missing at {scenarios_path}")
+
+    try:
+        scenario_plan = json.loads(scenarios_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"Usage scenarios file is not valid JSON: {exc.msg}") from exc
+
+    if not isinstance(scenario_plan, dict):
+        raise RuntimeError("Usage scenarios file must be a JSON object")
+
+    top_k = scenario_plan.get("top_k")
+    if not isinstance(top_k, int) or top_k <= 0:
+        raise RuntimeError("Usage scenarios file must declare a positive integer top_k")
+
+    scenarios = scenario_plan.get("scenarios")
+    if not isinstance(scenarios, list) or not scenarios:
+        raise RuntimeError("Usage scenarios file must contain a non-empty scenarios list")
+
+    for scenario in scenarios:
+        if not isinstance(scenario, dict):
+            raise RuntimeError("Each usage scenario entry must be a JSON object")
+        for required_field in ("scenario_id", "scenario_type", "anchor_id"):
+            value = scenario.get(required_field)
+            if not isinstance(value, str) or not value.strip():
+                raise RuntimeError(f"Usage scenario is missing required field {required_field}")
+        steps = scenario.get("steps")
+        if not isinstance(steps, list) or not steps:
+            raise RuntimeError("Usage scenario must contain a non-empty steps list")
+        for step in steps:
+            if not isinstance(step, dict):
+                raise RuntimeError("Usage scenario steps must be JSON objects")
+            for required_field in ("step_id", "query_text", "purpose"):
+                value = step.get(required_field)
+                if not isinstance(value, str) or not value.strip():
+                    raise RuntimeError(f"Usage scenario step is missing required field {required_field}")
+
+    return scenario_plan
+
+
+def load_usage_scenario_plan_from_bundle(
+    export_dir: Path,
+    manifest: dict[str, Any],
+    drawers: list[dict[str, Any]],
+) -> dict[str, Any]:
+    scenarios_path = export_dir / manifest["usage_validation"]["scenarios_file"]
+    legacy_defaulted = bool(manifest["usage_validation"].get("legacy_defaulted"))
+    if not scenarios_path.exists():
+        if legacy_defaulted:
+            scenario_plan = build_usage_scenario_plan(drawers, top_k=manifest["usage_validation"]["top_k"])
+            if not scenario_plan["scenarios"]:
+                raise RuntimeError("Usage scenarios file is missing and could not be reconstructed from the bundle")
+            return scenario_plan
+        raise RuntimeError(f"Usage scenarios file is missing at {scenarios_path}")
+
+    scenario_plan = load_usage_scenario_plan(scenarios_path)
+    if not legacy_defaulted and scenario_plan["top_k"] != manifest["usage_validation"]["top_k"]:
+        raise RuntimeError("Usage scenarios top_k does not match the export manifest")
+    if not legacy_defaulted and len(scenario_plan["scenarios"]) != manifest["usage_validation"]["scenario_count"]:
+        raise RuntimeError("Usage scenarios count does not match the export manifest")
+    return scenario_plan
+
+
+class _McpStdioSession:
+    def __init__(
+        self,
+        *,
+        command: list[str],
+        cwd: Path,
+        env: dict[str, str],
+        startup_grace_seconds: float,
+        request_timeout_seconds: float,
+    ) -> None:
+        self.command = command
+        self.cwd = cwd
+        self.env = env
+        self.startup_grace_seconds = startup_grace_seconds
+        self.request_timeout_seconds = request_timeout_seconds
+        self.process = subprocess.Popen(
+            command,
+            cwd=str(cwd),
+            env=env,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            bufsize=1,
+        )
+        self._stdout_queue: queue.Queue[str | None] = queue.Queue()
+        self._stderr_queue: queue.Queue[str | None] = queue.Queue()
+        self._stderr_lines: list[str] = []
+        self._stdout_thread = threading.Thread(
+            target=self._stream_to_queue, args=(self.process.stdout, self._stdout_queue), daemon=True
+        )
+        self._stderr_thread = threading.Thread(
+            target=self._stream_to_queue, args=(self.process.stderr, self._stderr_queue), daemon=True
+        )
+        self._stdout_thread.start()
+        self._stderr_thread.start()
+        time.sleep(self.startup_grace_seconds)
+
+    @staticmethod
+    def _stream_to_queue(stream: Any, output_queue: queue.Queue[str | None]) -> None:
+        try:
+            for line in iter(stream.readline, ""):
+                output_queue.put(line.rstrip("\n"))
+        finally:
+            output_queue.put(None)
+
+    def _drain_stderr(self) -> None:
+        while True:
+            try:
+                line = self._stderr_queue.get_nowait()
+            except queue.Empty:
+                return
+            if line is not None:
+                self._stderr_lines.append(line)
+
+    def stderr_preview(self) -> list[str]:
+        self._drain_stderr()
+        return self._stderr_lines[-DIAGNOSTIC_PREVIEW_COUNT:]
+
+    def _raise_if_exited(self, *, context: str) -> None:
+        self._drain_stderr()
+        if self.process.poll() is not None:
+            stderr_preview = _preview_items(self._stderr_lines)
+            raise RuntimeError(
+                f"MCP server exited during {context} with code {self.process.returncode}. "
+                f"stderr: {stderr_preview}"
+            )
+
+    def request(self, payload: dict[str, Any]) -> dict[str, Any]:
+        self._raise_if_exited(context="request setup")
+        if self.process.stdin is None:
+            raise RuntimeError("MCP server stdin is not available")
+        self.process.stdin.write(json.dumps(payload) + "\n")
+        self.process.stdin.flush()
+
+        deadline = time.time() + self.request_timeout_seconds
+        while time.time() < deadline:
+            self._drain_stderr()
+            self._raise_if_exited(context=f"request {payload.get('method')}")
+            timeout = max(0.05, min(0.25, deadline - time.time()))
+            try:
+                line = self._stdout_queue.get(timeout=timeout)
+            except queue.Empty:
+                continue
+            if line is None:
+                continue
+            if not line.strip():
+                continue
+            try:
+                response = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise RuntimeError(f"MCP server returned invalid JSON: {exc.msg}") from exc
+            return response
+
+        raise RuntimeError(f"MCP server timed out waiting for response to {payload.get('method')}")
+
+    def notify(self, payload: dict[str, Any]) -> None:
+        self._raise_if_exited(context="notification setup")
+        if self.process.stdin is None:
+            raise RuntimeError("MCP server stdin is not available")
+        self.process.stdin.write(json.dumps(payload) + "\n")
+        self.process.stdin.flush()
+
+    def close(self) -> None:
+        if self.process.poll() is None:
+            self.process.terminate()
+            try:
+                self.process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
+                self.process.wait(timeout=3)
+        if self.process.stdin is not None:
+            self.process.stdin.close()
+        if self.process.stdout is not None:
+            self.process.stdout.close()
+        if self.process.stderr is not None:
+            self.process.stderr.close()
+        self._drain_stderr()
+
+
+def _extract_mcp_text_result(response: dict[str, Any]) -> Any:
+    if "error" in response:
+        message = response["error"].get("message", "unknown MCP error")
+        raise RuntimeError(f"MCP tool call failed: {message}")
+
+    result = response.get("result")
+    if not isinstance(result, dict):
+        raise RuntimeError("MCP response is missing a result object")
+
+    content = result.get("content")
+    if not isinstance(content, list) or not content:
+        raise RuntimeError("MCP response is missing content")
+
+    first = content[0]
+    if not isinstance(first, dict) or first.get("type") != "text":
+        raise RuntimeError("MCP response content is not a text payload")
+
+    text = first.get("text")
+    if not isinstance(text, str):
+        raise RuntimeError("MCP text payload is missing")
+
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"MCP text payload is not valid JSON: {exc.msg}") from exc
+
+
+def _call_mcp_tool(session: _McpStdioSession, tool_name: str, arguments: dict[str, Any]) -> Any:
+    response = session.request(
+        {
+            "jsonrpc": "2.0",
+            "id": tool_name,
+            "method": "tools/call",
+            "params": {"name": tool_name, "arguments": arguments},
+        }
+    )
+    return _extract_mcp_text_result(response)
+
+
 def ensure_target_is_safe(target_palace: Path) -> None:
     if not target_palace.exists():
         return
@@ -973,6 +1385,7 @@ def import_drawers(export_dir: Path, target_palace: Path) -> dict[str, Any]:
     if export_issues:
         raise RuntimeError(f"Refusing import: export bundle integrity checks failed: {'; '.join(export_issues)}")
     load_retrieval_query_plan_from_bundle(export_dir, manifest)
+    load_usage_scenario_plan_from_bundle(export_dir, manifest, drawers)
 
     if manifest.get("source", {}).get("detected_format") != CLASS_CHROMA_0_6:
         raise RuntimeError(
@@ -1103,6 +1516,100 @@ def record_retrieval_results(
     return result
 
 
+def record_usage_results(
+    palace_path: Path,
+    scenarios_path: Path,
+    output_path: Path,
+    *,
+    label: str,
+) -> dict[str, Any]:
+    scenario_plan = load_usage_scenario_plan(scenarios_path)
+
+    import chromadb
+
+    client = chromadb.PersistentClient(path=str(palace_path))
+    collection = client.get_collection(COLLECTION_NAME)
+    effective_top_k = min(scenario_plan["top_k"], collection.count())
+
+    scenarios: list[dict[str, Any]] = []
+    for scenario in scenario_plan["scenarios"]:
+        steps: list[dict[str, Any]] = []
+        for step in scenario["steps"]:
+            response = collection.query(
+                query_texts=[step["query_text"]],
+                n_results=effective_top_k,
+                include=["documents", "metadatas", "distances"],
+            )
+
+            ids = list(response.get("ids", [[]])[0])
+            documents = list(response.get("documents", [[]])[0])
+            metadatas = list(response.get("metadatas", [[]])[0])
+            distances = list(response.get("distances", [[]])[0])
+            steps.append(
+                {
+                    "step_id": step["step_id"],
+                    "query_text": step["query_text"],
+                    "purpose": step["purpose"],
+                    "result_count": len(ids),
+                    "ids": ids,
+                    "anchor_present": scenario["anchor_id"] in ids,
+                    "top_result_id": ids[0] if ids else None,
+                    "top_distance": distances[0] if distances else None,
+                    "results": [
+                        {
+                            "id": drawer_id,
+                            "distance": distances[index] if index < len(distances) else None,
+                            "document_preview": (
+                                documents[index][:RETRIEVAL_QUERY_CHAR_LIMIT]
+                                if index < len(documents) and isinstance(documents[index], str)
+                                else None
+                            ),
+                            "metadata": metadatas[index] if index < len(metadatas) else None,
+                        }
+                        for index, drawer_id in enumerate(ids)
+                    ],
+                }
+            )
+
+        final_step = steps[-1]
+        scenarios.append(
+            {
+                "scenario_id": scenario["scenario_id"],
+                "scenario_type": scenario["scenario_type"],
+                "anchor_id": scenario["anchor_id"],
+                "wing": scenario.get("wing"),
+                "room": scenario.get("room"),
+                "document_preview": scenario.get("document_preview"),
+                "selection_reason": scenario.get("selection_reason"),
+                "step_count": len(steps),
+                "steps": steps,
+                "final_step_id": final_step["step_id"],
+                "final_anchor_present": final_step["anchor_present"],
+                "final_result_count": final_step["result_count"],
+            }
+        )
+
+    result = {
+        "format_version": USAGE_FORMAT_VERSION,
+        "created_at": _iso_timestamp_now(),
+        "label": label,
+        "palace_path": str(palace_path),
+        "scenarios_path": str(scenarios_path),
+        "collection_name": COLLECTION_NAME,
+        "chromadb_version": _load_package_version("chromadb"),
+        "top_k": scenario_plan["top_k"],
+        "effective_top_k": effective_top_k,
+        "scenario_count": len(scenarios),
+        "scenarios": scenarios,
+    }
+
+    with output_path.open("w", encoding="utf-8") as handle:
+        json.dump(result, handle, indent=2)
+        handle.write("\n")
+
+    return result
+
+
 def _index_retrieval_results(results_bundle: dict[str, Any]) -> dict[str, dict[str, Any]]:
     results = results_bundle.get("results")
     if not isinstance(results, list) or not results:
@@ -1136,6 +1643,42 @@ def load_retrieval_results(results_path: Path) -> dict[str, Any]:
         raise RuntimeError("Retrieval results file must declare a positive integer top_k")
 
     _index_retrieval_results(results_bundle)
+    return results_bundle
+
+
+def _index_usage_results(results_bundle: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    scenarios = results_bundle.get("scenarios")
+    if not isinstance(scenarios, list) or not scenarios:
+        raise RuntimeError("Usage results bundle must contain a non-empty scenarios list")
+
+    indexed: dict[str, dict[str, Any]] = {}
+    for scenario in scenarios:
+        if not isinstance(scenario, dict):
+            raise RuntimeError("Usage result entries must be JSON objects")
+        scenario_id = scenario.get("scenario_id")
+        if not isinstance(scenario_id, str) or not scenario_id:
+            raise RuntimeError("Usage result entry is missing scenario_id")
+        indexed[scenario_id] = scenario
+    return indexed
+
+
+def load_usage_results(results_path: Path) -> dict[str, Any]:
+    if not results_path.exists():
+        raise RuntimeError(f"Usage results file is missing at {results_path}")
+
+    try:
+        results_bundle = json.loads(results_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise RuntimeError(f"Usage results file is not valid JSON: {exc.msg}") from exc
+
+    if not isinstance(results_bundle, dict):
+        raise RuntimeError("Usage results file must be a JSON object")
+
+    top_k = results_bundle.get("top_k")
+    if not isinstance(top_k, int) or top_k <= 0:
+        raise RuntimeError("Usage results file must declare a positive integer top_k")
+
+    _index_usage_results(results_bundle)
     return results_bundle
 
 
@@ -1276,9 +1819,426 @@ def compare_retrieval_results(
     }
 
 
+def _index_usage_steps(steps: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    indexed: dict[str, dict[str, Any]] = {}
+    for step in steps:
+        if not isinstance(step, dict):
+            raise RuntimeError("Usage result steps must be JSON objects")
+        step_id = step.get("step_id")
+        if not isinstance(step_id, str) or not step_id:
+            raise RuntimeError("Usage result step is missing step_id")
+        indexed[step_id] = step
+    return indexed
+
+
+def compare_usage_results(
+    source_results_path: Path,
+    target_results_path: Path,
+    *,
+    count_tolerance: int = USAGE_COUNT_TOLERANCE,
+    min_overlap_ratio: float = USAGE_MIN_OVERLAP_RATIO,
+) -> dict[str, Any]:
+    if count_tolerance < 0:
+        raise RuntimeError("Usage count_tolerance must be non-negative")
+    if not 0 <= min_overlap_ratio <= 1:
+        raise RuntimeError("Usage min_overlap_ratio must be between 0 and 1")
+
+    source_bundle = load_usage_results(source_results_path)
+    target_bundle = load_usage_results(target_results_path)
+    source_index = _index_usage_results(source_bundle)
+    target_index = _index_usage_results(target_bundle)
+
+    source_scenario_ids = sorted(source_index)
+    target_scenario_ids = sorted(target_index)
+    scenario_plan_matches = (
+        source_scenario_ids == target_scenario_ids and source_bundle["top_k"] == target_bundle["top_k"]
+    )
+
+    compared_scenarios: list[dict[str, Any]] = []
+    all_source_results_present = True
+    all_source_anchor_present = True
+    all_target_results_present = True
+    all_target_anchor_present = True
+    all_counts_within_tolerance = True
+    all_overlap_meets_threshold = True
+    recommendation = USAGE_ACCEPTABLE
+
+    for scenario_id in source_scenario_ids:
+        if scenario_id not in target_index:
+            continue
+
+        source_scenario = source_index[scenario_id]
+        target_scenario = target_index[scenario_id]
+        source_steps = _index_usage_steps(list(source_scenario.get("steps", [])))
+        target_steps = _index_usage_steps(list(target_scenario.get("steps", [])))
+        step_ids = sorted(source_steps)
+        step_plan_matches = step_ids == sorted(target_steps)
+
+        step_results: list[dict[str, Any]] = []
+        scenario_has_unusable_mismatch = not step_plan_matches
+        scenario_has_degraded_mismatch = False
+        scenario_source_results_present = True
+        scenario_source_anchor_present = True
+        scenario_target_results_present = True
+        scenario_target_anchor_present = True
+        scenario_counts_within_tolerance = True
+        scenario_overlap_meets_threshold = True
+
+        for step_id in step_ids:
+            if step_id not in target_steps:
+                continue
+            source_step = source_steps[step_id]
+            target_step = target_steps[step_id]
+            source_ids = list(source_step.get("ids", []))
+            target_ids = list(target_step.get("ids", []))
+            overlap_ids = sorted(set(source_ids) & set(target_ids))
+            source_count = len(source_ids)
+            target_count = len(target_ids)
+            overlap_count = len(overlap_ids)
+            source_has_results = source_count > 0
+            target_has_results = target_count > 0
+            source_anchor_present = bool(source_step.get("anchor_present"))
+            target_anchor_present = bool(target_step.get("anchor_present"))
+            source_overlap = _ratio(overlap_count, source_count)
+            count_difference = abs(source_count - target_count)
+            counts_within_tolerance = count_difference <= count_tolerance
+            overlap_meets_threshold = source_overlap >= min_overlap_ratio
+
+            mismatches: list[str] = []
+            if not source_has_results:
+                mismatches.append("source returned no results")
+            if not source_anchor_present:
+                mismatches.append("source did not retrieve anchor id")
+            if source_has_results and not target_has_results:
+                mismatches.append("target returned no results")
+                scenario_has_unusable_mismatch = True
+            if source_anchor_present and not target_anchor_present:
+                mismatches.append("target did not retrieve anchor id")
+                scenario_has_degraded_mismatch = True
+            if not counts_within_tolerance:
+                mismatches.append(
+                    f"result count difference {count_difference} exceeds tolerance {count_tolerance}"
+                )
+                scenario_has_degraded_mismatch = True
+            if source_has_results and not overlap_meets_threshold:
+                mismatches.append(
+                    f"source overlap ratio {source_overlap} is below threshold {min_overlap_ratio}"
+                )
+                if overlap_count == 0:
+                    scenario_has_unusable_mismatch = True
+                else:
+                    scenario_has_degraded_mismatch = True
+
+            step_results.append(
+                {
+                    "step_id": step_id,
+                    "query_text": source_step.get("query_text"),
+                    "source_result_count": source_count,
+                    "target_result_count": target_count,
+                    "count_difference": count_difference,
+                    "source_ids": source_ids,
+                    "target_ids": target_ids,
+                    "overlap_ids": overlap_ids,
+                    "overlap_count": overlap_count,
+                    "source_overlap_ratio": source_overlap,
+                    "source_top_result_id": source_step.get("top_result_id"),
+                    "target_top_result_id": target_step.get("top_result_id"),
+                    "checks": {
+                        "source_has_results": source_has_results,
+                        "source_anchor_present": source_anchor_present,
+                        "target_has_results": target_has_results,
+                        "target_anchor_present": target_anchor_present,
+                        "result_count_within_tolerance": counts_within_tolerance,
+                        "id_overlap_meets_threshold": overlap_meets_threshold,
+                    },
+                    "mismatches": mismatches,
+                }
+            )
+
+            scenario_source_results_present &= source_has_results
+            scenario_source_anchor_present &= source_anchor_present
+            scenario_target_results_present &= (not source_has_results) or target_has_results
+            scenario_target_anchor_present &= (not source_anchor_present) or target_anchor_present
+            scenario_counts_within_tolerance &= counts_within_tolerance
+            scenario_overlap_meets_threshold &= (not source_has_results) or overlap_meets_threshold
+
+        scenario_recommendation = USAGE_ACCEPTABLE
+        if scenario_has_unusable_mismatch:
+            scenario_recommendation = USAGE_UNUSABLE
+        elif scenario_has_degraded_mismatch:
+            scenario_recommendation = USAGE_DEGRADED
+
+        compared_scenarios.append(
+            {
+                "scenario_id": scenario_id,
+                "scenario_type": source_scenario.get("scenario_type"),
+                "anchor_id": source_scenario.get("anchor_id"),
+                "step_plan_matches": step_plan_matches,
+                "checks": {
+                    "source_results_present": scenario_source_results_present,
+                    "source_anchor_ids_present": scenario_source_anchor_present,
+                    "target_results_present": scenario_target_results_present,
+                    "target_anchor_ids_present": scenario_target_anchor_present,
+                    "result_counts_within_tolerance": scenario_counts_within_tolerance,
+                    "id_overlap_meets_threshold": scenario_overlap_meets_threshold,
+                },
+                "steps": step_results,
+                "recommendation": scenario_recommendation,
+            }
+        )
+
+        all_source_results_present &= scenario_source_results_present
+        all_source_anchor_present &= scenario_source_anchor_present
+        all_target_results_present &= scenario_target_results_present
+        all_target_anchor_present &= scenario_target_anchor_present
+        all_counts_within_tolerance &= scenario_counts_within_tolerance
+        all_overlap_meets_threshold &= scenario_overlap_meets_threshold
+        if scenario_recommendation == USAGE_UNUSABLE:
+            recommendation = USAGE_UNUSABLE
+        elif scenario_recommendation == USAGE_DEGRADED and recommendation != USAGE_UNUSABLE:
+            recommendation = USAGE_DEGRADED
+
+    checks = {
+        "scenario_plan_matches": scenario_plan_matches,
+        "source_results_present": all_source_results_present,
+        "source_anchor_ids_present": all_source_anchor_present,
+        "target_results_present": all_target_results_present,
+        "target_anchor_ids_present": all_target_anchor_present,
+        "result_counts_within_tolerance": all_counts_within_tolerance,
+        "id_overlap_meets_threshold": all_overlap_meets_threshold,
+    }
+    if not scenario_plan_matches:
+        recommendation = USAGE_UNUSABLE
+
+    return {
+        "source_results_path": str(source_results_path),
+        "target_results_path": str(target_results_path),
+        "checks": checks,
+        "tolerances": {
+            "count_tolerance": count_tolerance,
+            "min_overlap_ratio": min_overlap_ratio,
+        },
+        "summary": {
+            "scenario_count": len(compared_scenarios),
+            "source_label": source_bundle.get("label"),
+            "target_label": target_bundle.get("label"),
+            "acceptable_scenarios": len(
+                [scenario for scenario in compared_scenarios if scenario["recommendation"] == USAGE_ACCEPTABLE]
+            ),
+            "degraded_scenarios": len(
+                [scenario for scenario in compared_scenarios if scenario["recommendation"] == USAGE_DEGRADED]
+            ),
+            "unusable_scenarios": len(
+                [scenario for scenario in compared_scenarios if scenario["recommendation"] == USAGE_UNUSABLE]
+            ),
+        },
+        "scenarios": compared_scenarios,
+        "recommendation": recommendation,
+        "valid": recommendation == USAGE_ACCEPTABLE
+        and checks["scenario_plan_matches"]
+        and checks["source_results_present"]
+        and checks["target_results_present"]
+        and checks["target_anchor_ids_present"]
+        and checks["result_counts_within_tolerance"]
+        and checks["id_overlap_meets_threshold"],
+    }
+
+
+def validate_mcp_runtime(
+    export_dir: Path,
+    palace_path: Path,
+    *,
+    python_executable: Path,
+    launcher_script: Path,
+    startup_grace_seconds: float = MCP_STARTUP_GRACE_SECONDS,
+    request_timeout_seconds: float = MCP_REQUEST_TIMEOUT_SECONDS,
+) -> dict[str, Any]:
+    manifest, export_drawers = load_export_bundle(export_dir)
+    query_plan = load_retrieval_query_plan_from_bundle(export_dir, manifest)
+    if not query_plan["queries"]:
+        raise RuntimeError("MCP runtime validation requires a non-empty retrieval query plan")
+
+    export_analysis = _analyze_drawers(export_drawers)
+    expected_count = export_analysis["drawer_count"]
+    expected_taxonomy = export_analysis["wing_room_counts"]
+    expected_documents = export_analysis["indexes"]["documents_by_id"]
+
+    repo_root = Path(__file__).resolve().parents[1]
+    resolved_python = Path(os.path.abspath(str(python_executable.expanduser())))
+    resolved_launcher = launcher_script.expanduser()
+    if not resolved_launcher.is_absolute():
+        resolved_launcher = (repo_root / resolved_launcher).resolve()
+
+    if not resolved_python.exists():
+        raise RuntimeError(f"Python executable is missing at {resolved_python}")
+    if not resolved_launcher.exists():
+        raise RuntimeError(f"Launcher script is missing at {resolved_launcher}")
+
+    uv_path = _resolve_uv_path()
+
+    env = os.environ.copy()
+    for variable in (
+        "PYTHONHOME",
+        "PYTHONPATH",
+        "VIRTUAL_ENV",
+        "UV_ACTIVE",
+        "UV_PROJECT_ENVIRONMENT",
+        "__PYVENV_LAUNCHER__",
+        "PYTHONEXECUTABLE",
+    ):
+        env.pop(variable, None)
+    env["MEMPALACE_PALACE_PATH"] = str(palace_path)
+    if uv_path is not None:
+        command = [
+            uv_path,
+            "run",
+            "--python",
+            str(resolved_python),
+            "python",
+            str(resolved_launcher),
+        ]
+    else:
+        command = [str(resolved_python), str(resolved_launcher)]
+
+    checks = {
+        "server_started": False,
+        "initialize_succeeded": False,
+        "tools_listed": False,
+        "required_tools_available": False,
+        "status_matches_drawer_count": False,
+        "status_reports_target_palace": False,
+        "taxonomy_matches_export": False,
+        "search_results_present": False,
+        "anchor_texts_present": False,
+        "server_stable_during_queries": False,
+    }
+    diagnostics: dict[str, Any] = {
+        "command": command,
+        "palace_path": str(palace_path),
+        "tools_available": [],
+        "status": None,
+        "taxonomy": None,
+        "queries": [],
+        "stderr_preview": [],
+    }
+
+    session = _McpStdioSession(
+        command=command,
+        cwd=repo_root,
+        env=env,
+        startup_grace_seconds=startup_grace_seconds,
+        request_timeout_seconds=request_timeout_seconds,
+    )
+
+    try:
+        checks["server_started"] = session.process.poll() is None
+
+        initialize_response = session.request(
+            {
+                "jsonrpc": "2.0",
+                "id": "initialize",
+                "method": "initialize",
+                "params": {
+                    "protocolVersion": MCP_PROTOCOL_VERSION,
+                    "clientInfo": {"name": "reconstruction-prototype", "version": "1"},
+                },
+            }
+        )
+        if "error" in initialize_response:
+            raise RuntimeError(
+                f"MCP initialize failed: {initialize_response['error'].get('message', 'unknown error')}"
+            )
+        checks["initialize_succeeded"] = True
+
+        session.notify({"jsonrpc": "2.0", "method": "notifications/initialized"})
+
+        tools_response = session.request({"jsonrpc": "2.0", "id": "tools-list", "method": "tools/list"})
+        if "error" in tools_response:
+            raise RuntimeError(
+                f"MCP tools/list failed: {tools_response['error'].get('message', 'unknown error')}"
+            )
+        tools = tools_response.get("result", {}).get("tools", [])
+        if not isinstance(tools, list):
+            raise RuntimeError("MCP tools/list returned an invalid tools payload")
+        checks["tools_listed"] = True
+        tool_names = sorted(
+            [tool["name"] for tool in tools if isinstance(tool, dict) and isinstance(tool.get("name"), str)]
+        )
+        diagnostics["tools_available"] = tool_names
+        required_tools = {"mempalace_status", "mempalace_get_taxonomy", "mempalace_search"}
+        checks["required_tools_available"] = required_tools.issubset(set(tool_names))
+
+        status_payload = _call_mcp_tool(session, "mempalace_status", {})
+        diagnostics["status"] = status_payload
+        if isinstance(status_payload, dict) and "error" not in status_payload:
+            checks["status_matches_drawer_count"] = status_payload.get("total_drawers") == expected_count
+            checks["status_reports_target_palace"] = (
+                Path(str(status_payload.get("palace_path", ""))).resolve() == palace_path.resolve()
+            )
+
+        taxonomy_payload = _call_mcp_tool(session, "mempalace_get_taxonomy", {})
+        diagnostics["taxonomy"] = taxonomy_payload
+        if isinstance(taxonomy_payload, dict) and "error" not in taxonomy_payload:
+            checks["taxonomy_matches_export"] = taxonomy_payload.get("taxonomy") == expected_taxonomy
+
+        search_results_present = True
+        anchor_texts_present = True
+        for query in query_plan["queries"]:
+            search_payload = _call_mcp_tool(
+                session,
+                "mempalace_search",
+                {"query": query["query_text"], "limit": query_plan["top_k"]},
+            )
+            results = search_payload.get("results", []) if isinstance(search_payload, dict) else []
+            anchor_text = expected_documents[query["anchor_id"]]
+            result_texts = [result.get("text") for result in results if isinstance(result, dict)]
+            anchor_present = anchor_text in result_texts
+            result_count = len(results)
+
+            mismatches: list[str] = []
+            if isinstance(search_payload, dict) and "error" in search_payload:
+                mismatches.append(str(search_payload["error"]))
+            if result_count == 0:
+                mismatches.append("search returned no results")
+                search_results_present = False
+            if not anchor_present:
+                mismatches.append("anchor text not present in MCP search results")
+                anchor_texts_present = False
+
+            diagnostics["queries"].append(
+                {
+                    "query_id": query["query_id"],
+                    "query_text": query["query_text"],
+                    "anchor_id": query["anchor_id"],
+                    "anchor_text_present": anchor_present,
+                    "result_count": result_count,
+                    "top_result_preview": result_texts[0][:RETRIEVAL_QUERY_CHAR_LIMIT] if result_texts else None,
+                    "mismatches": mismatches,
+                }
+            )
+
+        checks["search_results_present"] = search_results_present
+        checks["anchor_texts_present"] = anchor_texts_present
+        checks["server_stable_during_queries"] = session.process.poll() is None
+    finally:
+        diagnostics["stderr_preview"] = session.stderr_preview()
+        session.close()
+
+    return {
+        "export_dir": str(export_dir),
+        "palace_path": str(palace_path),
+        "python_executable": str(resolved_python),
+        "launcher_script": str(resolved_launcher),
+        "checks": checks,
+        "diagnostics": diagnostics,
+        "valid": all(checks.values()),
+    }
+
+
 def validate_reconstruction(export_dir: Path, target_palace: Path) -> dict[str, Any]:
     manifest, export_drawers = load_export_bundle(export_dir)
     load_retrieval_query_plan_from_bundle(export_dir, manifest)
+    load_usage_scenario_plan_from_bundle(export_dir, manifest, export_drawers)
     export_analysis = _analyze_drawers(export_drawers)
     expected_count = export_analysis["drawer_count"]
     expected_counts = export_analysis["wing_room_counts"]
@@ -1424,6 +2384,12 @@ def _print_export_result(manifest: dict[str, Any], export_dir: Path) -> None:
             f"[INFO]  Retrieval queries: {retrieval.get('query_count')} "
             f"(top_k={retrieval.get('top_k')})"
         )
+    usage = manifest.get("usage_validation", {})
+    if usage:
+        print(
+            f"[INFO]  Usage scenarios: {usage.get('scenario_count')} "
+            f"(top_k={usage.get('top_k')})"
+        )
     if manifest["warnings"]:
         for warning in manifest["warnings"]:
             print(f"[WARN]  {warning}")
@@ -1440,6 +2406,14 @@ def _print_import_result(target_manifest: dict[str, Any], target_palace: Path) -
 def _print_retrieval_record_result(result: dict[str, Any], output_path: Path) -> None:
     print(
         f"[OK]    Recorded retrieval results for {result['query_count']} queries to {output_path}"
+    )
+    print(f"[INFO]  Label: {result['label']}")
+    print(f"[INFO]  Palace: {result['palace_path']}")
+
+
+def _print_usage_record_result(result: dict[str, Any], output_path: Path) -> None:
+    print(
+        f"[OK]    Recorded usage results for {result['scenario_count']} scenarios to {output_path}"
     )
     print(f"[INFO]  Label: {result['label']}")
     print(f"[INFO]  Palace: {result['palace_path']}")
@@ -1540,6 +2514,96 @@ def _print_retrieval_comparison_result(result: dict[str, Any]) -> None:
             )
 
 
+def _print_mcp_runtime_result(result: dict[str, Any]) -> None:
+    if result["valid"]:
+        print("[OK]    MCP runtime validation passed")
+    else:
+        print("[ERROR] MCP runtime validation failed", file=sys.stderr)
+
+    for check_name, passed in result["checks"].items():
+        prefix = "[OK]   " if passed else "[FAIL] "
+        stream = sys.stdout if passed else sys.stderr
+        print(f"{prefix} {check_name}", file=stream)
+
+    print(
+        f"[INFO]  Launcher: {result['python_executable']} {result['launcher_script']}"
+    )
+    print(f"[INFO]  Palace: {result['palace_path']}")
+
+    diagnostics = result["diagnostics"]
+    for query in diagnostics["queries"]:
+        if not query["mismatches"]:
+            continue
+        print(
+            f"[INFO]  {query['query_id']} result_count={query['result_count']} "
+            f"anchor_text_present={query['anchor_text_present']}",
+            file=sys.stderr,
+        )
+        print(
+            f"[INFO]  {query['query_id']} mismatches: {_preview_items(query['mismatches'])}",
+            file=sys.stderr,
+        )
+
+    if diagnostics["stderr_preview"]:
+        print(
+            f"[INFO]  Server stderr: {_preview_items(diagnostics['stderr_preview'])}",
+            file=sys.stderr,
+        )
+
+
+def _print_usage_comparison_result(result: dict[str, Any]) -> None:
+    if result["valid"]:
+        print("[OK]    Usage comparison passed")
+    else:
+        print("[ERROR] Usage comparison detected divergence", file=sys.stderr)
+
+    for check_name, passed in result["checks"].items():
+        warning = (
+            not passed
+            and result["recommendation"] == USAGE_ACCEPTABLE
+            and check_name.startswith("source_")
+        )
+        if warning:
+            prefix = "[WARN] "
+            stream = sys.stdout
+        else:
+            prefix = "[OK]   " if passed else "[FAIL] "
+            stream = sys.stdout if passed else sys.stderr
+        print(f"{prefix} {check_name}", file=stream)
+
+    summary = result["summary"]
+    print(
+        "[INFO]  Usage recommendation: "
+        f"{result['recommendation']} "
+        f"(acceptable={summary['acceptable_scenarios']} "
+        f"degraded={summary['degraded_scenarios']} "
+        f"unusable={summary['unusable_scenarios']})"
+    )
+
+    for scenario in result["scenarios"]:
+        if scenario["recommendation"] == USAGE_ACCEPTABLE:
+            continue
+        print(
+            f"[INFO]  {scenario['scenario_id']} type={scenario['scenario_type']} "
+            f"recommendation={scenario['recommendation']}",
+            file=sys.stderr,
+        )
+        for step in scenario["steps"]:
+            if not step["mismatches"]:
+                continue
+            print(
+                f"[INFO]  {scenario['scenario_id']} {step['step_id']} mismatches: "
+                f"{_preview_items(step['mismatches'])}",
+                file=sys.stderr,
+            )
+            if step["overlap_ids"]:
+                print(
+                    f"[INFO]  {scenario['scenario_id']} {step['step_id']} overlap ids: "
+                    f"{_preview_items(step['overlap_ids'])}",
+                    file=sys.stderr,
+                )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
@@ -1612,6 +2676,70 @@ def main() -> int:
     )
     compare_retrieval_parser.add_argument("--json", action="store_true", help="Print JSON result")
 
+    record_usage_parser = subparsers.add_parser(
+        "record-usage",
+        help="Run deterministic usage scenarios against one palace and store the results",
+    )
+    record_usage_parser.add_argument("--palace", required=True, help="Path to the palace to query")
+    record_usage_parser.add_argument(
+        "--scenarios-file",
+        required=True,
+        help="Path to the usage scenarios JSON file generated from the export bundle",
+    )
+    record_usage_parser.add_argument(
+        "--output",
+        required=True,
+        help="Path to write the usage results JSON artifact",
+    )
+    record_usage_parser.add_argument("--label", required=True, help="Label for this result set, e.g. source or target")
+    record_usage_parser.add_argument("--json", action="store_true", help="Print JSON result")
+
+    compare_usage_parser = subparsers.add_parser(
+        "compare-usage",
+        help="Compare recorded usage results from source and reconstructed target palaces",
+    )
+    compare_usage_parser.add_argument(
+        "--source-results",
+        required=True,
+        help="Path to the source usage results JSON artifact",
+    )
+    compare_usage_parser.add_argument(
+        "--target-results",
+        required=True,
+        help="Path to the target usage results JSON artifact",
+    )
+    compare_usage_parser.add_argument(
+        "--count-tolerance",
+        type=int,
+        default=USAGE_COUNT_TOLERANCE,
+        help="Maximum allowed absolute difference in result counts per step",
+    )
+    compare_usage_parser.add_argument(
+        "--min-overlap-ratio",
+        type=float,
+        default=USAGE_MIN_OVERLAP_RATIO,
+        help="Minimum required overlap ratio against the source result set",
+    )
+    compare_usage_parser.add_argument("--json", action="store_true", help="Print JSON result")
+
+    validate_mcp_parser = subparsers.add_parser(
+        "validate-mcp-runtime",
+        help="Probe MCP startup and tool queries against a palace using an experimental launcher",
+    )
+    validate_mcp_parser.add_argument("--export-dir", required=True, help="Path to an export bundle directory")
+    validate_mcp_parser.add_argument("--palace", required=True, help="Path to the palace to validate through MCP")
+    validate_mcp_parser.add_argument(
+        "--python",
+        required=True,
+        help="Path to the Python executable in the runtime environment that should launch the MCP server",
+    )
+    validate_mcp_parser.add_argument(
+        "--launcher-script",
+        default="scripts/run_mcp_server_exploration.py",
+        help="Launcher script to execute with the selected Python (default: exploration launcher)",
+    )
+    validate_mcp_parser.add_argument("--json", action="store_true", help="Print JSON result")
+
     args = parser.parse_args()
 
     try:
@@ -1665,6 +2793,48 @@ def main() -> int:
                 print()
             else:
                 _print_retrieval_comparison_result(result)
+            return 0 if result["valid"] else 1
+
+        if args.command == "record-usage":
+            result = record_usage_results(
+                palace_path=Path(args.palace).expanduser().resolve(),
+                scenarios_path=Path(args.scenarios_file).expanduser().resolve(),
+                output_path=Path(args.output).expanduser().resolve(),
+                label=args.label,
+            )
+            if args.json:
+                json.dump(result, sys.stdout, indent=2)
+                print()
+            else:
+                _print_usage_record_result(result, Path(args.output).expanduser().resolve())
+            return 0
+
+        if args.command == "compare-usage":
+            result = compare_usage_results(
+                source_results_path=Path(args.source_results).expanduser().resolve(),
+                target_results_path=Path(args.target_results).expanduser().resolve(),
+                count_tolerance=args.count_tolerance,
+                min_overlap_ratio=args.min_overlap_ratio,
+            )
+            if args.json:
+                json.dump(result, sys.stdout, indent=2)
+                print()
+            else:
+                _print_usage_comparison_result(result)
+            return 0 if result["valid"] else 1
+
+        if args.command == "validate-mcp-runtime":
+            result = validate_mcp_runtime(
+                export_dir=Path(args.export_dir).expanduser().resolve(),
+                palace_path=Path(args.palace).expanduser().resolve(),
+                python_executable=Path(args.python),
+                launcher_script=Path(args.launcher_script),
+            )
+            if args.json:
+                json.dump(result, sys.stdout, indent=2)
+                print()
+            else:
+                _print_mcp_runtime_result(result)
             return 0 if result["valid"] else 1
 
         result = validate_reconstruction(

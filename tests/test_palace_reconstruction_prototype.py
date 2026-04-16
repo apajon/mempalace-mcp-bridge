@@ -9,20 +9,25 @@ from pathlib import Path
 
 
 SCRIPTS_DIR = Path(__file__).resolve().parents[1] / "scripts"
+REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
 from palace_reconstruction_prototype import (  # type: ignore
     DRAWERS_FILENAME,
     EXPORT_MANIFEST_FILENAME,
-    TARGET_MANIFEST_FILENAME,
     RETRIEVAL_QUERIES_FILENAME,
+    TARGET_MANIFEST_FILENAME,
+    USAGE_SCENARIOS_FILENAME,
     COLLECTION_NAME,
+    compare_usage_results,
     compare_retrieval_results,
     export_drawers,
     import_drawers,
+    record_usage_results,
     record_retrieval_results,
     summarize_drawers,
+    validate_mcp_runtime,
     validate_reconstruction,
 )
 
@@ -193,11 +198,14 @@ class PalaceReconstructionPrototypeTests(unittest.TestCase):
         self.assertTrue((export_dir / EXPORT_MANIFEST_FILENAME).exists())
         self.assertTrue((export_dir / DRAWERS_FILENAME).exists())
         self.assertTrue((export_dir / RETRIEVAL_QUERIES_FILENAME).exists())
+        self.assertTrue((export_dir / USAGE_SCENARIOS_FILENAME).exists())
         self.assertEqual(export_manifest["summary"]["drawer_count"], 2)
         self.assertEqual(export_manifest["bundle_type"], "mempalace_reconstruction_bundle")
         self.assertEqual(export_manifest["files"]["drawers"], DRAWERS_FILENAME)
         self.assertEqual(export_manifest["files"]["retrieval_queries"], RETRIEVAL_QUERIES_FILENAME)
+        self.assertEqual(export_manifest["files"]["usage_scenarios"], USAGE_SCENARIOS_FILENAME)
         self.assertEqual(export_manifest["collection"]["name"], COLLECTION_NAME)
+        self.assertGreaterEqual(export_manifest["usage_validation"]["scenario_count"], 3)
 
         target_manifest = import_drawers(export_dir, target)
         self.assertTrue((target / TARGET_MANIFEST_FILENAME).exists())
@@ -262,6 +270,7 @@ class PalaceReconstructionPrototypeTests(unittest.TestCase):
         del manifest["files"]
         del manifest["collection"]
         del manifest["retrieval_validation"]
+        del manifest["usage_validation"]
         manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
 
         target_manifest = import_drawers(export_dir, target)
@@ -391,6 +400,142 @@ class PalaceReconstructionPrototypeTests(unittest.TestCase):
         self.assertFalse(comparison["checks"]["target_anchor_ids_present"])
         self.assertFalse(comparison["checks"]["id_overlap_meets_threshold"])
         self.assertGreaterEqual(len(comparison["summary"]["mismatch_query_ids"]), 1)
+
+    def test_validate_mcp_runtime_succeeds_against_reconstructed_target(self) -> None:
+        source = self._write_queryable_palace(name="source-palace")
+        export_dir = self.root / "export"
+        target = self.root / "target"
+
+        export_drawers(source, export_dir)
+        import_drawers(export_dir, target)
+
+        result = validate_mcp_runtime(
+            export_dir,
+            target,
+            python_executable=REPO_ROOT / ".venv/bin/python",
+            launcher_script=SCRIPTS_DIR / "run_mcp_server_exploration.py",
+        )
+
+        self.assertTrue(result["valid"])
+        self.assertTrue(result["checks"]["server_started"])
+        self.assertTrue(result["checks"]["required_tools_available"])
+        self.assertTrue(result["checks"]["status_matches_drawer_count"])
+        self.assertTrue(result["checks"]["taxonomy_matches_export"])
+        self.assertTrue(result["checks"]["search_results_present"])
+        self.assertTrue(result["checks"]["anchor_texts_present"])
+
+    def test_validate_mcp_runtime_detects_runtime_query_mismatch(self) -> None:
+        source = self._write_queryable_palace(name="source-palace")
+        export_dir = self.root / "export"
+        target = self.root / "target"
+
+        export_drawers(source, export_dir)
+        import_drawers(export_dir, target)
+
+        collection = self._open_target_collection(target)
+        collection.delete(ids=["drawer_alpha", "drawer_beta", "drawer_gamma"])
+        collection.add(
+            ids=["drawer_delta", "drawer_epsilon", "drawer_zeta"],
+            documents=[
+                "delta unrelated content about another topic",
+                "epsilon unrelated content about another topic",
+                "zeta unrelated content about another topic",
+            ],
+            metadatas=[
+                {"wing": "other", "room": "misc", "chunk_index": 10},
+                {"wing": "other", "room": "misc", "chunk_index": 11},
+                {"wing": "other", "room": "misc", "chunk_index": 12},
+            ],
+        )
+
+        result = validate_mcp_runtime(
+            export_dir,
+            target,
+            python_executable=REPO_ROOT / ".venv/bin/python",
+            launcher_script=SCRIPTS_DIR / "run_mcp_server_exploration.py",
+        )
+
+        self.assertFalse(result["valid"])
+        self.assertFalse(result["checks"]["taxonomy_matches_export"])
+        self.assertFalse(result["checks"]["anchor_texts_present"])
+        self.assertTrue(any(query["mismatches"] for query in result["diagnostics"]["queries"]))
+
+    def test_record_and_compare_usage_roundtrip(self) -> None:
+        source = self._write_queryable_palace(name="source-palace")
+        export_dir = self.root / "export"
+        target = self.root / "target"
+        source_results = self.root / "source-usage.json"
+        target_results = self.root / "target-usage.json"
+
+        export_drawers(source, export_dir)
+        import_drawers(export_dir, target)
+
+        source_record = record_usage_results(
+            source,
+            export_dir / USAGE_SCENARIOS_FILENAME,
+            source_results,
+            label="source",
+        )
+        target_record = record_usage_results(
+            target,
+            export_dir / USAGE_SCENARIOS_FILENAME,
+            target_results,
+            label="target",
+        )
+        comparison = compare_usage_results(source_results, target_results)
+
+        self.assertEqual(source_record["scenario_count"], target_record["scenario_count"])
+        self.assertTrue(comparison["valid"])
+        self.assertEqual(comparison["recommendation"], "acceptable")
+        self.assertTrue(comparison["checks"]["scenario_plan_matches"])
+        self.assertTrue(comparison["checks"]["target_anchor_ids_present"])
+
+    def test_compare_usage_detects_degraded_behavior(self) -> None:
+        source = self._write_queryable_palace(name="source-palace")
+        export_dir = self.root / "export"
+        target = self.root / "target"
+        source_results = self.root / "source-usage.json"
+        target_results = self.root / "target-usage.json"
+
+        export_drawers(source, export_dir)
+        import_drawers(export_dir, target)
+
+        collection = self._open_target_collection(target)
+        collection.delete(ids=["drawer_alpha", "drawer_beta", "drawer_gamma"])
+        collection.add(
+            ids=["drawer_delta", "drawer_epsilon", "drawer_zeta"],
+            documents=[
+                "delta unrelated content about another topic",
+                "epsilon unrelated content about another topic",
+                "zeta unrelated content about another topic",
+            ],
+            metadatas=[
+                {"wing": "other", "room": "misc", "chunk_index": 10},
+                {"wing": "other", "room": "misc", "chunk_index": 11},
+                {"wing": "other", "room": "misc", "chunk_index": 12},
+            ],
+        )
+
+        record_usage_results(
+            source,
+            export_dir / USAGE_SCENARIOS_FILENAME,
+            source_results,
+            label="source",
+        )
+        record_usage_results(
+            target,
+            export_dir / USAGE_SCENARIOS_FILENAME,
+            target_results,
+            label="target",
+        )
+        comparison = compare_usage_results(source_results, target_results)
+
+        self.assertFalse(comparison["valid"])
+        self.assertIn(comparison["recommendation"], {"degraded", "unusable"})
+        self.assertGreaterEqual(
+            comparison["summary"]["degraded_scenarios"] + comparison["summary"]["unusable_scenarios"],
+            1,
+        )
 
 
 if __name__ == "__main__":
