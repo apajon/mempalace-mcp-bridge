@@ -69,7 +69,7 @@ MCP client (VS Code / Copilot Chat / other)
 ## Auto-start sequence
 
 1. User opens a chat session in the MCP-compatible client
-2. Client reads `.vscode/mcp.json` (or equivalent config)
+2. Client reads `.mcp.json` (or equivalent config)
 3. Client launches `uv run --directory <repo> python scripts/run_mcp_server.py` as a subprocess
 4. Server starts in stdio mode and waits for MCP protocol messages
 5. When the user asks a question, the client may call `mempalace` tools

@@ -18,11 +18,11 @@ This means **you never need to run `run_manual_mcp.sh` in a terminal** — the c
 
 ## MCP config for VS Code / Copilot Chat
 
-Create or edit `.vscode/mcp.json` in your workspace:
+Create or edit `.mcp.json` in your workspace:
 
 ```json
 {
-  "servers": {
+  "mcpServers": {
     "mempalace": {
       "type": "stdio",
       "command": "/ABSOLUTE/PATH/TO/uv",
@@ -40,6 +40,12 @@ which uv
 ```
 
 A ready-to-copy example is at `examples/mcp/vscode.mcp.json`.
+
+If you have an older `.vscode/mcp.json`, migrate it with:
+
+```bash
+jq '{mcpServers: .servers}' .vscode/mcp.json > .mcp.json
+```
 
 > **Why absolute path?** MCP clients often launch processes in a limited environment where `$PATH` may not include your shell's customizations. Using an absolute path avoids "command not found" errors.
 
