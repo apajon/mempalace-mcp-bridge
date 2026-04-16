@@ -121,11 +121,11 @@ fi
 
 ## Step 4 — Configure the MCP server in VS Code
 
-In `.vscode/mcp.json` of the devcontainer workspace:
+In `.mcp.json` at the devcontainer workspace root:
 
 ```json
 {
-  "servers": {
+  "mcpServers": {
     "mempalace": {
       "type": "stdio",
       "command": "/home/<container-user>/.local/bin/uv",
@@ -156,7 +156,7 @@ VS Code Copilot will start the MCP server automatically when the chat is opened.
 |---|---|
 | `devcontainer.json` | Robust `initializeCommand` + readonly mount from `${localEnv:HOME}/git/mempalace-mcp-bridge` |
 | `post-create.sh` | Conditional block: `UV_PROJECT_ENVIRONMENT=... uv sync` + `check_palace_health.sh` |
-| `.vscode/mcp.json` | MCP server config with `env.MEMPALACE_PALACE_PATH` |
+| `.mcp.json` | MCP server config with `env.MEMPALACE_PALACE_PATH` |
 
 ---
 
@@ -168,7 +168,7 @@ VS Code Copilot will start the MCP server automatically when the chat is opened.
 | `MemPalace: not available, skipping` | Empty mount — `pyproject.toml` missing | Verify that `~/git/mempalace-mcp-bridge` exists on the host and that the mount points to the repo root |
 | Bridge mount is empty in the container | `~/git/mempalace-mcp-bridge` is missing on the host or mounted from the wrong absolute path | Clone the bridge at `~/git/mempalace-mcp-bridge`, or replace the mount source with the correct absolute host path |
 | `uv sync` fails with a write or permission error under `/opt/mempalace-mcp-bridge` | The bridge repo is mounted read-only | Set `UV_PROJECT_ENVIRONMENT=/home/<container-user>/.venv/mempalace-mcp-bridge` before `uv sync` |
-| `"No palace found"` in MCP tools | Palace not mounted or `MEMPALACE_PALACE_PATH` missing/incorrect | Check the `~/.mempalace` bind mount and the `env.MEMPALACE_PALACE_PATH` key in `mcp.json` |
+| `"No palace found"` in MCP tools | Palace not mounted or `MEMPALACE_PALACE_PATH` missing/incorrect | Check the `~/.mempalace` bind mount and the `env.MEMPALACE_PALACE_PATH` key in `.mcp.json` |
 | Palace present on host but empty in container | Incorrect `<container-user>` in the mount or in `MEMPALACE_PALACE_PATH` | Run `whoami` inside the container and fix both occurrences of `<container-user>` |
-| MCP server does not start | Incorrect `uv` path in `mcp.json` | Check with `which uv` in a devcontainer terminal and fix the `command` key |
+| MCP server does not start | Incorrect `uv` path in `.mcp.json` | Check with `which uv` in a devcontainer terminal and fix the `command` key |
 | `uv: command not found` in container | `uv` missing from the Docker image | Add `RUN pip install uv` to the Dockerfile or via an `onCreateCommand` |

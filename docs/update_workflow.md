@@ -24,14 +24,14 @@ Then reload your VS Code window (`Ctrl+Shift+P` → **Developer: Reload Window**
 | `git pull` | Pulls the latest changes from this repo |
 | Upgrades MemPalace in `.venv` | `uv pip install --upgrade "mempalace>=3.0.0" "chromadb>=0.6,<0.7"` |
 | Enforces supported ChromaDB line | Fails fast unless installed `chromadb` is on the tested `0.6.x` line |
-| Checks `.vscode/mcp.json` paths | Regenerates only if paths are wrong or stale |
+| Checks `.mcp.json` paths | Regenerates only if paths are wrong or stale |
 | Runs `verify.sh` | Confirms the full stack is still healthy |
 
 ## What `update.sh` does NOT do
 
 - **Never touches `~/.mempalace/palace`** — your notes and memories are always preserved
 - Does not delete or recreate `.venv`
-- Does not overwrite `.vscode/mcp.json` if the paths are still correct
+- Does not overwrite `.mcp.json` if the paths are still correct
 
 ---
 
@@ -47,7 +47,7 @@ already complete, including skipping MCP config regeneration if the paths are co
 
 | Situation | What happens |
 |-----------|-------------|
-| Repo moved to a different path | `update.sh` detects the stale path and regenerates `.vscode/mcp.json` |
+| Repo moved to a different path | `update.sh` detects the stale path and regenerates `.mcp.json` |
 | `uv` reinstalled to a different location | Same — stale command path is detected and fixed |
 | `.venv` partially broken | `verify.sh` fails; re-run `bash setup.sh` to repair |
 | MemPalace introduces breaking changes | `verify.sh` reports failures with actionable messages |
@@ -80,8 +80,8 @@ Healthy example:
 [PASS] chromadb 0.6.x is on the supported 0.6.x line
 [PASS] mempalace CLI responds
 [PASS] Sample notes found in examples/sample_notes/ (3 files)
-[PASS] VS Code MCP config points to the guarded launcher (.vscode/mcp.json)
-[PASS] MCP server starts and stays alive with the exact VS Code launch command
+[PASS] Workspace MCP config points to the guarded launcher (.mcp.json)
+[PASS] MCP server starts and stays alive with the exact workspace launch command
 [PASS] Palace is readable
 [PASS] Palace manifest exists and matches the active environment
 [PASS] Palace path is outside container-local filesystems (~/.mempalace/palace)

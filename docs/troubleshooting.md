@@ -83,7 +83,7 @@ uv run --python .venv/bin/python mempalace mine /path/to/your/notes/
   ```bash
   which uv
   ```
-- Is the config file in the right place (`.vscode/mcp.json` for VS Code)?
+- Is the config file in the right place (`.mcp.json` at the workspace root)?
 - Did you reload/restart the MCP client after editing the config?
 - Does the config use `"type": "stdio"`?
 
