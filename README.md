@@ -30,11 +30,21 @@ This repo provides a plug-and-play bridge:
 > If you already rely on existing palaces, this repo prioritizes stability over latest-package tracking.
 > `main` fails fast when the installed `chromadb` version is outside that supported line.
 
+> **Reconstruction workflow status**
+> A separate `0.6.x` → `1.x` reconstruction workflow exists only as an **experimental prototype**.
+> It is **not part of the supported bridge path**, **not an in-place migration tool**, and **not a supported upgrade path**.
+> Use it only for lab-style evaluation with a preserved source palace and a disposable target.
+
 ---
 
 ## Install
 
-Download the latest release: https://github.com/apajon/mempalace-mcp-bridge/releases
+For the stable path, download the latest stable release:
+https://github.com/apajon/mempalace-mcp-bridge/releases
+
+Do **not** use normal stable releases for the reconstruction prototype. If an experimental
+reconstruction release is published, it should be consumed only through its dedicated experimental
+branch/tag and documentation.
 
 ---
 
@@ -46,6 +56,13 @@ This repo is for you if:
 - you want a local setup with no manual MCP wiring
 - you want a stable setup for existing palaces on Chroma `0.6.x`
 - you prefer reproducibility over chasing the newest Chroma release
+
+This repo is **not** for you if:
+
+- you need official ChromaDB `1.x` support on the stable path today
+- you need a one-command supported migration from `0.6.x` to `1.x`
+- you cannot keep the original palace intact while evaluating a rebuilt target
+- you need a guarantee that a reconstructed target will behave identically through MCP
 
 ---
 
@@ -117,8 +134,78 @@ Then ask Copilot about anything in those files.
 - This bridge currently targets ChromaDB `0.6.x`, not ChromaDB `1.x`
 - `main` hard-fails outside the supported `chromadb>=0.6,<0.7` range
 - Existing palaces are preserved, but automatic migration to ChromaDB `1.x` is not supported here
+- The reconstruction prototype can validate structure, retrieval, usage, and runtime experimentally, but that still does **not** make `1.x` a supported bridge target
+- Current evidence is not strong enough to guarantee MCP usability on reconstructed `1.x` targets
 - Linux / WSL2 is the tested path today
 - Copilot behavior remains probabilistic even with MemPalace as the preferred context source
+
+---
+
+## ChromaDB `1.x` reconstruction status
+
+**Official status: experimental.**
+
+The repo contains a non-destructive reconstruction prototype for exporting a stable `0.6.x`
+palace, rebuilding it into a separate `1.x` target, and validating the result. That prototype is
+useful for investigation, but it is **not supported bridge functionality**.
+
+### What is guaranteed
+
+- the stable bridge path remains pinned to ChromaDB `0.6.x`
+- the prototype is designed to preserve the original source palace
+- reconstruction is performed into a separate target directory
+- the prototype can run explicit structural, retrieval, usage, and MCP runtime checks
+
+### What is not guaranteed
+
+- successful reconstruction on every palace
+- search-quality equivalence between source and target
+- MCP runtime compatibility on reconstructed `1.x` targets
+- support for historical pre-`0.6` palaces
+- a supported cutover procedure
+
+### Who should use it
+
+- maintainers and advanced users evaluating migration feasibility
+- users who can keep the source palace untouched and treat the target as disposable
+- users comfortable reading validation output and making a manual go/no-go decision
+
+### Who should not use it
+
+- users looking for the normal setup path in this repository
+- users expecting production support or stable upgrade guarantees
+- users who need automatic cutover, rollback tooling, or parity guarantees
+
+### User-facing warnings
+
+- do **not** overwrite the source palace
+- do **not** treat a reconstructed `1.x` target as supported just because export/import succeeded
+- do **not** switch Copilot/MCP to a reconstructed target without passing all relevant validation
+- do **not** assume retrieval parity implies MCP runtime parity
+
+See:
+
+- [docs/chromadb_reconstruction_prototype.md](docs/chromadb_reconstruction_prototype.md)
+- [docs/chromadb_reconstruction_migration.md](docs/chromadb_reconstruction_migration.md)
+- [docs/chromadb_reconstruction_experimental_release.md](docs/chromadb_reconstruction_experimental_release.md)
+
+---
+
+## Experimental release channel
+
+If the reconstruction workflow is exposed publicly, the recommended release shape is:
+
+- stable releases remain `0.6.x` only
+- reconstruction is published only through a clearly named experimental branch/tag
+- the workflow stays manual and opt-in
+- stable setup/update/verify behavior remains unchanged
+
+Recommended structure:
+
+- stable releases: `vX.Y.Z`
+- experimental reconstruction previews: `exp-reconstruction-vX.Y.Z`
+
+Do **not** treat an experimental release as supported ChromaDB `1.x` bridge functionality.
 
 ---
 
@@ -205,7 +292,9 @@ If you want to go deeper:
 | Architecture overview | [docs/architecture.md](docs/architecture.md) |
 | MCP config and VS Code integration | [docs/mcp_vscode.md](docs/mcp_vscode.md) |
 | Palace format detection | [docs/palace_format_detection.md](docs/palace_format_detection.md) |
+| Reconstruction workflow status and prototype | [docs/chromadb_reconstruction_prototype.md](docs/chromadb_reconstruction_prototype.md) |
 | Reconstruction migration assessment | [docs/chromadb_reconstruction_migration.md](docs/chromadb_reconstruction_migration.md) |
+| Experimental release strategy | [docs/chromadb_reconstruction_experimental_release.md](docs/chromadb_reconstruction_experimental_release.md) |
 | Devcontainer integration | [docs/devcontainer_integration.md](docs/devcontainer_integration.md) |
 | Update and verify workflow | [docs/update_workflow.md](docs/update_workflow.md) |
 | Troubleshooting | [docs/troubleshooting.md](docs/troubleshooting.md) |

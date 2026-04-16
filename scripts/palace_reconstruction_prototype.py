@@ -1416,8 +1416,9 @@ def import_drawers(export_dir: Path, target_palace: Path) -> dict[str, Any]:
         "format_version": TARGET_FORMAT_VERSION,
         "created_at": _iso_timestamp_now(),
         "warnings": [
-            "Experimental reconstruction target. Do not cut over automatically.",
-            "Validation is required before any manual switch.",
+            "Experimental reconstruction target. This is not supported bridge infrastructure.",
+            "Do not cut over automatically. Keep the source palace intact until manual review is complete.",
+            "Validation is required before any manual switch, and passing validation does not imply supported MCP runtime behavior.",
         ],
         "target": {
             "palace_path": str(target_palace),

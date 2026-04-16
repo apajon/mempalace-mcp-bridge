@@ -2,9 +2,16 @@
 
 ## Status
 
-**Recommendation: defer.**
+**Recommendation: experimental only.**
 
 A reconstruction-style migration from the stable `0.6.x` line to a `1.x` line appears **feasible in principle**, but it is **not yet trustworthy enough to claim support**.
+
+Official positioning in this repository should be:
+
+- **experimental**
+- **unsupported as a normal user workflow**
+- **source-preserving and validation-first**
+- **not a supported upgrade path**
 
 The current evidence says:
 
@@ -381,4 +388,11 @@ That direction is technically plausible with the current upstream and repo build
 
 So the right recommendation today is:
 
-**Defer official migration support, but continue with an experimental reconstruction prototype only if it remains explicitly non-destructive and validation-first.**
+**Keep official migration support deferred, but continue the reconstruction workflow only as an experimental prototype that remains explicitly non-destructive and validation-first.**
+
+That means:
+
+- document it openly
+- keep warnings prominent
+- avoid claiming ChromaDB `1.x` support for the bridge itself
+- limit the intended audience to maintainers and advanced evaluators
