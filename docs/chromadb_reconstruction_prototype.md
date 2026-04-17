@@ -6,6 +6,65 @@ This is an **exploration-only prototype** for a non-destructive migration flow f
 
 It is **not** stable support and **not** an automatic migration path.
 
+## Official status
+
+**Classification: experimental.**
+
+This workflow is intentionally positioned between “unsupported” and “supported”:
+
+- it is **more structured than an ad-hoc unsafe hack**
+- it is **less than supported product functionality**
+
+So the right public description is:
+
+- **experimental reconstruction workflow**
+- **unsupported for normal bridge use**
+- **manual, validation-first, source-preserving**
+
+It should **not** be described as a supported upgrade path.
+
+If it is ever exposed publicly, it should be exposed only through a clearly marked experimental
+release channel, not through the normal stable bridge flow. See
+`docs/chromadb_reconstruction_experimental_release.md`.
+
+## Positioning summary
+
+### What is guaranteed
+
+- the source palace is meant to stay untouched
+- reconstruction targets a separate directory
+- validation is explicit and deterministic
+- the workflow can detect many classes of structural drift, retrieval drift, usage drift, and MCP runtime failure
+
+### What is not guaranteed
+
+- successful reconstruction for every palace
+- identical retrieval ranking
+- identical user-visible behavior
+- MCP runtime compatibility on reconstructed `1.x` targets
+- support for old pre-`0.6` palaces
+- safe cutover automation
+
+### Who should use it
+
+- maintainers
+- advanced users evaluating migration feasibility
+- users who can treat the target as disposable and keep the source as rollback
+
+### Who should not use it
+
+- normal bridge users who just want a supported install path
+- users who need production guarantees
+- users who cannot interpret validation output or perform a manual cutover decision
+
+## User-facing warnings
+
+- Do **not** overwrite the source palace.
+- Do **not** treat a rebuilt `1.x` target as supported bridge infrastructure.
+- Do **not** switch the MCP backend just because export/import succeeded.
+- Do **not** assume retrieval checks prove MCP runtime compatibility.
+- Do **not** assume validation on one palace generalizes to all palaces.
+
 ## Prototype design
 
 The prototype is intentionally split into six manual phases:
@@ -914,4 +973,11 @@ The prototype is useful as a narrow lab workflow because it is:
 - explicit about target path separation
 - validation-first
 
-But it still needs stronger validation before anyone should trust it for real migration decisions.
+But it still should be presented conservatively:
+
+- **experimental** for maintainers and advanced evaluators
+- **unsupported** as a general bridge workflow
+- **not suitable for marketing as ChromaDB `1.x` support**
+
+Even strong prototype validation does not yet justify claiming supported migration or supported `1.x`
+runtime use in this repository.
