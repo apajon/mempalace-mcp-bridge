@@ -1,0 +1,660 @@
+{
+  "created_at": "2026-04-17T18:49:30Z",
+  "work_directory": "/tmp/robustness_jgfokqmp",
+  "case_count": 19,
+  "outcome_counts": {
+    "full_success": 7,
+    "degraded": 0,
+    "partial_failure": 10,
+    "hard_failure": 2
+  },
+  "results": [
+    {
+      "case": "valid_baseline",
+      "defect": null,
+      "source_drawer_count": 3,
+      "stages": {
+        "extract": {
+          "status": "ok",
+          "drawer_count": 3,
+          "sample_ids": [
+            "d1",
+            "d2",
+            "d3"
+          ]
+        },
+        "export": {
+          "status": "ok",
+          "drawer_count": 3,
+          "warnings": []
+        },
+        "import": {
+          "status": "ok",
+          "imported_drawer_count": 3
+        },
+        "validate": {
+          "status": "ok",
+          "drawer_match": null,
+          "document_match_ratio": null,
+          "metadata_match_ratio": null,
+          "error_count": 0,
+          "warning_count": 0
+        },
+        "integrity_crosscheck": {
+          "status": "ok",
+          "source_id_count": 3,
+          "target_id_count": 3,
+          "missing_in_target": [],
+          "extra_in_target": [],
+          "content_mismatches": []
+        }
+      },
+      "outcome": "full_success",
+      "outcome_reason": "all stages passed cleanly",
+      "root_cause_class": null,
+      "error_message": null,
+      "traceback": null
+    },
+    {
+      "case": "missing_metadata",
+      "defect": "missing wing/room/all metadata fields",
+      "source_drawer_count": 5,
+      "stages": {
+        "extract": {
+          "status": "ok",
+          "drawer_count": 5,
+          "sample_ids": [
+            "d1",
+            "d2",
+            "d3",
+            "d4",
+            "d5"
+          ]
+        },
+        "export": {
+          "status": "ok",
+          "drawer_count": 5,
+          "warnings": []
+        },
+        "import": {
+          "status": "rejected",
+          "stage": "import",
+          "category": "data integrity",
+          "summary": "target runtime rejected a batch during import",
+          "details": [
+            "batch index: 1",
+            "batch size: 5",
+            "affected drawer ids: d1, d2, d3, d4, d5",
+            "runtime error: Expected metadata to be a non-empty dict, got 0 metadata attributes in add."
+          ]
+        }
+      },
+      "outcome": "partial_failure",
+      "outcome_reason": "import rejected: target runtime rejected a batch during import",
+      "root_cause_class": "expected_limitation",
+      "error_message": "target runtime rejected a batch during import: batch index: 1; batch size: 5; affected drawer ids: d1, d2, d3, d4, d5; runtime error: Expected metadata to be a non-empty dict, got 0 metadata attributes in add.",
+      "traceback": null
+    },
+    {
+      "case": "inconsistent_wing_room",
+      "defect": "empty/special/long wing/room names",
+      "source_drawer_count": 6,
+      "stages": {
+        "extract": {
+          "status": "ok",
+          "drawer_count": 6,
+          "sample_ids": [
+            "d1",
+            "d2",
+            "d3",
+            "d4",
+            "d5"
+          ]
+        },
+        "export": {
+          "status": "ok",
+          "drawer_count": 6,
+          "warnings": []
+        },
+        "import": {
+          "status": "ok",
+          "imported_drawer_count": 6
+        },
+        "validate": {
+          "status": "ok",
+          "drawer_match": null,
+          "document_match_ratio": null,
+          "metadata_match_ratio": null,
+          "error_count": 0,
+          "warning_count": 0
+        },
+        "integrity_crosscheck": {
+          "status": "ok",
+          "source_id_count": 6,
+          "target_id_count": 6,
+          "missing_in_target": [],
+          "extra_in_target": [],
+          "content_mismatches": []
+        }
+      },
+      "outcome": "full_success",
+      "outcome_reason": "all stages passed cleanly",
+      "root_cause_class": null,
+      "error_message": null,
+      "traceback": null
+    },
+    {
+      "case": "duplicate_ids",
+      "defect": "embedding_id 'd1' appears twice",
+      "source_drawer_count": 4,
+      "stages": {
+        "extract": {
+          "status": "ok",
+          "drawer_count": 3,
+          "sample_ids": [
+            "d1",
+            "d2",
+            "d3"
+          ]
+        },
+        "export": {
+          "status": "rejected",
+          "stage": "export",
+          "category": "data integrity",
+          "summary": "source palace failed integrity checks before bundle generation",
+          "details": [
+            "duplicate source ids: d1",
+            "exported drawer count does not match sqlite embeddings rows (3 != 4)"
+          ]
+        }
+      },
+      "outcome": "partial_failure",
+      "outcome_reason": "export rejected: source palace failed integrity checks before bundle generation",
+      "root_cause_class": "expected_limitation",
+      "error_message": "source palace failed integrity checks before bundle generation: duplicate source ids: d1; exported drawer count does not match sqlite embeddings rows (3 != 4)",
+      "traceback": null
+    },
+    {
+      "case": "blank_ids",
+      "defect": "NULL, empty, and whitespace-only embedding_ids",
+      "source_drawer_count": 4,
+      "stages": {
+        "extract": {
+          "status": "ok",
+          "drawer_count": 3,
+          "sample_ids": [
+            "",
+            "   ",
+            "d1"
+          ]
+        },
+        "export": {
+          "status": "rejected",
+          "stage": "export",
+          "category": "data integrity",
+          "summary": "source palace failed integrity checks before bundle generation",
+          "details": [
+            "blank source ids at sqlite rows 2, 3, 4",
+            "exported drawer count does not match sqlite embeddings rows (3 != 4)"
+          ]
+        }
+      },
+      "outcome": "partial_failure",
+      "outcome_reason": "export rejected: source palace failed integrity checks before bundle generation",
+      "root_cause_class": "expected_limitation",
+      "error_message": "source palace failed integrity checks before bundle generation: blank source ids at sqlite rows 2, 3, 4; exported drawer count does not match sqlite embeddings rows (3 != 4)",
+      "traceback": null
+    },
+    {
+      "case": "missing_document",
+      "defect": "drawer d3 has no chroma:document entry",
+      "source_drawer_count": 3,
+      "stages": {
+        "extract": {
+          "status": "ok",
+          "drawer_count": 2,
+          "sample_ids": [
+            "d1",
+            "d2"
+          ]
+        },
+        "export": {
+          "status": "rejected",
+          "stage": "export",
+          "category": "data integrity",
+          "summary": "source palace failed integrity checks before bundle generation",
+          "details": [
+            "invalid chroma:document entry counts at sqlite rows 3",
+            "exported drawer count does not match sqlite embeddings rows (2 != 3)"
+          ]
+        }
+      },
+      "outcome": "partial_failure",
+      "outcome_reason": "export rejected: source palace failed integrity checks before bundle generation",
+      "root_cause_class": "expected_limitation",
+      "error_message": "source palace failed integrity checks before bundle generation: invalid chroma:document entry counts at sqlite rows 3; exported drawer count does not match sqlite embeddings rows (2 != 3)",
+      "traceback": null
+    },
+    {
+      "case": "duplicate_document_entries",
+      "defect": "d2 has 2 chroma:document entries",
+      "source_drawer_count": 2,
+      "stages": {
+        "extract": {
+          "status": "ok",
+          "drawer_count": 2,
+          "sample_ids": [
+            "d1",
+            "d2"
+          ]
+        },
+        "export": {
+          "status": "rejected",
+          "stage": "export",
+          "category": "data integrity",
+          "summary": "source palace failed integrity checks before bundle generation",
+          "details": [
+            "invalid chroma:document entry counts at sqlite rows 2"
+          ]
+        }
+      },
+      "outcome": "partial_failure",
+      "outcome_reason": "export rejected: source palace failed integrity checks before bundle generation",
+      "root_cause_class": "expected_limitation",
+      "error_message": "source palace failed integrity checks before bundle generation: invalid chroma:document entry counts at sqlite rows 2",
+      "traceback": null
+    },
+    {
+      "case": "duplicate_metadata_keys",
+      "defect": "d2 has 'wing' duplicated",
+      "source_drawer_count": 2,
+      "stages": {
+        "extract": {
+          "status": "ok",
+          "drawer_count": 2,
+          "sample_ids": [
+            "d1",
+            "d2"
+          ]
+        },
+        "export": {
+          "status": "rejected",
+          "stage": "export",
+          "category": "data integrity",
+          "summary": "source palace failed integrity checks before bundle generation",
+          "details": [
+            "duplicate metadata keys at sqlite rows 2"
+          ]
+        }
+      },
+      "outcome": "partial_failure",
+      "outcome_reason": "export rejected: source palace failed integrity checks before bundle generation",
+      "root_cause_class": "expected_limitation",
+      "error_message": "source palace failed integrity checks before bundle generation: duplicate metadata keys at sqlite rows 2",
+      "traceback": null
+    },
+    {
+      "case": "unicode_edge_cases",
+      "defect": "emoji/CJK/RTL/diacritics/zero-width/null-byte/astral/100K",
+      "source_drawer_count": 8,
+      "stages": {
+        "extract": {
+          "status": "ok",
+          "drawer_count": 8,
+          "sample_ids": [
+            "d1",
+            "d2",
+            "d3",
+            "d4",
+            "d5"
+          ]
+        },
+        "export": {
+          "status": "ok",
+          "drawer_count": 8,
+          "warnings": []
+        },
+        "import": {
+          "status": "ok",
+          "imported_drawer_count": 8
+        },
+        "validate": {
+          "status": "ok",
+          "drawer_match": null,
+          "document_match_ratio": null,
+          "metadata_match_ratio": null,
+          "error_count": 0,
+          "warning_count": 0
+        },
+        "integrity_crosscheck": {
+          "status": "ok",
+          "source_id_count": 8,
+          "target_id_count": 8,
+          "missing_in_target": [],
+          "extra_in_target": [],
+          "content_mismatches": []
+        }
+      },
+      "outcome": "full_success",
+      "outcome_reason": "all stages passed cleanly",
+      "root_cause_class": null,
+      "error_message": null,
+      "traceback": null
+    },
+    {
+      "case": "large_content",
+      "defect": "1MB + 10MB + 10K-line documents",
+      "source_drawer_count": 4,
+      "stages": {
+        "extract": {
+          "status": "ok",
+          "drawer_count": 4,
+          "sample_ids": [
+            "d1",
+            "d2",
+            "d3",
+            "d4"
+          ]
+        },
+        "export": {
+          "status": "ok",
+          "drawer_count": 4,
+          "warnings": []
+        },
+        "import": {
+          "status": "ok",
+          "imported_drawer_count": 4
+        },
+        "validate": {
+          "status": "ok",
+          "drawer_match": null,
+          "document_match_ratio": null,
+          "metadata_match_ratio": null,
+          "error_count": 0,
+          "warning_count": 0
+        },
+        "integrity_crosscheck": {
+          "status": "ok",
+          "source_id_count": 4,
+          "target_id_count": 4,
+          "missing_in_target": [],
+          "extra_in_target": [],
+          "content_mismatches": []
+        }
+      },
+      "outcome": "full_success",
+      "outcome_reason": "all stages passed cleanly",
+      "root_cause_class": null,
+      "error_message": null,
+      "traceback": null
+    },
+    {
+      "case": "empty_palace",
+      "defect": "zero drawers in embeddings table",
+      "source_drawer_count": 0,
+      "stages": {
+        "extract": {
+          "status": "ok",
+          "drawer_count": 0,
+          "sample_ids": []
+        },
+        "export": {
+          "status": "rejected",
+          "stage": "export",
+          "category": "data integrity",
+          "summary": "no drawers were extracted from the source palace",
+          "details": [
+            "sqlite path: /tmp/robustness_jgfokqmp/palaces/empty_palace/chroma.sqlite3"
+          ]
+        }
+      },
+      "outcome": "partial_failure",
+      "outcome_reason": "export rejected: no drawers were extracted from the source palace",
+      "root_cause_class": "expected_limitation",
+      "error_message": "no drawers were extracted from the source palace: sqlite path: /tmp/robustness_jgfokqmp/palaces/empty_palace/chroma.sqlite3",
+      "traceback": null
+    },
+    {
+      "case": "missing_sqlite",
+      "defect": "no chroma.sqlite3 file",
+      "source_drawer_count": 0,
+      "stages": {
+        "extract": {
+          "status": "skipped",
+          "reason": "no chroma.sqlite3"
+        }
+      },
+      "outcome": "partial_failure",
+      "outcome_reason": "missing sqlite file",
+      "root_cause_class": "expected_limitation",
+      "error_message": "Source palace has no chroma.sqlite3",
+      "traceback": null
+    },
+    {
+      "case": "corrupted_sqlite",
+      "defect": "chroma.sqlite3 is not a valid SQLite file",
+      "source_drawer_count": 0,
+      "stages": {
+        "extract": {
+          "status": "error",
+          "error": "file is not a database"
+        }
+      },
+      "outcome": "hard_failure",
+      "outcome_reason": "extract crashed: file is not a database",
+      "root_cause_class": "expected_limitation",
+      "error_message": "file is not a database",
+      "traceback": "Traceback (most recent call last):\n  File \"/home/adrienpagon/git/mempalace-mcp-bridge/scripts/investigation/robustness_harness.py\", line 82, in _run_case\n    drawers = extract_drawers_from_sqlite(db_path)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/adrienpagon/git/mempalace-mcp-bridge/scripts/palace_reconstruction_prototype.py\", line 974, in extract_drawers_from_sqlite\n    rows = conn.execute(\n           ^^^^^^^^^^^^^\nsqlite3.DatabaseError: file is not a database\n"
+    },
+    {
+      "case": "wrong_schema",
+      "defect": "SQLite has wrong table schema (no embeddings/embedding_metadata)",
+      "source_drawer_count": 0,
+      "stages": {
+        "extract": {
+          "status": "error",
+          "error": "no such table: embeddings"
+        }
+      },
+      "outcome": "hard_failure",
+      "outcome_reason": "extract crashed: no such table: embeddings",
+      "root_cause_class": "expected_limitation",
+      "error_message": "no such table: embeddings",
+      "traceback": "Traceback (most recent call last):\n  File \"/home/adrienpagon/git/mempalace-mcp-bridge/scripts/investigation/robustness_harness.py\", line 82, in _run_case\n    drawers = extract_drawers_from_sqlite(db_path)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/adrienpagon/git/mempalace-mcp-bridge/scripts/palace_reconstruction_prototype.py\", line 974, in extract_drawers_from_sqlite\n    rows = conn.execute(\n           ^^^^^^^^^^^^^\nsqlite3.OperationalError: no such table: embeddings\n"
+    },
+    {
+      "case": "mixed_format_signals",
+      "defect": "0.6.x manifest but extra 1.x-style tables",
+      "source_drawer_count": 2,
+      "stages": {
+        "extract": {
+          "status": "ok",
+          "drawer_count": 2,
+          "sample_ids": [
+            "d1",
+            "d2"
+          ]
+        },
+        "export": {
+          "status": "ok",
+          "drawer_count": 2,
+          "warnings": []
+        },
+        "import": {
+          "status": "ok",
+          "imported_drawer_count": 2
+        },
+        "validate": {
+          "status": "ok",
+          "drawer_match": null,
+          "document_match_ratio": null,
+          "metadata_match_ratio": null,
+          "error_count": 0,
+          "warning_count": 0
+        },
+        "integrity_crosscheck": {
+          "status": "ok",
+          "source_id_count": 2,
+          "target_id_count": 2,
+          "missing_in_target": [],
+          "extra_in_target": [],
+          "content_mismatches": []
+        }
+      },
+      "outcome": "full_success",
+      "outcome_reason": "all stages passed cleanly",
+      "root_cause_class": null,
+      "error_message": null,
+      "traceback": null
+    },
+    {
+      "case": "no_manifest",
+      "defect": "no bridge manifest (structural detection only)",
+      "source_drawer_count": 2,
+      "stages": {
+        "extract": {
+          "status": "ok",
+          "drawer_count": 2,
+          "sample_ids": [
+            "d1",
+            "d2"
+          ]
+        },
+        "export": {
+          "status": "rejected",
+          "stage": "export",
+          "category": "structural",
+          "summary": "source palace is not classified as chroma_0_6",
+          "details": [
+            "detected classification: unknown"
+          ]
+        }
+      },
+      "outcome": "partial_failure",
+      "outcome_reason": "export rejected: source palace is not classified as chroma_0_6",
+      "root_cause_class": "expected_limitation",
+      "error_message": "source palace is not classified as chroma_0_6: detected classification: unknown",
+      "traceback": null
+    },
+    {
+      "case": "conflicting_manifest",
+      "defect": "manifest says 0.6.x line but 1.5.7 version",
+      "source_drawer_count": 1,
+      "stages": {
+        "extract": {
+          "status": "ok",
+          "drawer_count": 1,
+          "sample_ids": [
+            "d1"
+          ]
+        },
+        "export": {
+          "status": "rejected",
+          "stage": "export",
+          "category": "structural",
+          "summary": "source palace is not classified as chroma_0_6",
+          "details": [
+            "detected classification: unknown"
+          ]
+        }
+      },
+      "outcome": "partial_failure",
+      "outcome_reason": "export rejected: source palace is not classified as chroma_0_6",
+      "root_cause_class": "expected_limitation",
+      "error_message": "source palace is not classified as chroma_0_6: detected classification: unknown",
+      "traceback": null
+    },
+    {
+      "case": "single_drawer",
+      "defect": null,
+      "source_drawer_count": 1,
+      "stages": {
+        "extract": {
+          "status": "ok",
+          "drawer_count": 1,
+          "sample_ids": [
+            "only_one"
+          ]
+        },
+        "export": {
+          "status": "ok",
+          "drawer_count": 1,
+          "warnings": []
+        },
+        "import": {
+          "status": "ok",
+          "imported_drawer_count": 1
+        },
+        "validate": {
+          "status": "ok",
+          "drawer_match": null,
+          "document_match_ratio": null,
+          "metadata_match_ratio": null,
+          "error_count": 0,
+          "warning_count": 0
+        },
+        "integrity_crosscheck": {
+          "status": "ok",
+          "source_id_count": 1,
+          "target_id_count": 1,
+          "missing_in_target": [],
+          "extra_in_target": [],
+          "content_mismatches": []
+        }
+      },
+      "outcome": "full_success",
+      "outcome_reason": "all stages passed cleanly",
+      "root_cause_class": null,
+      "error_message": null,
+      "traceback": null
+    },
+    {
+      "case": "metadata_type_edge",
+      "defect": "large int/float/bool/empty/negative/inf metadata values",
+      "source_drawer_count": 7,
+      "stages": {
+        "extract": {
+          "status": "ok",
+          "drawer_count": 7,
+          "sample_ids": [
+            "d1",
+            "d2",
+            "d3",
+            "d4",
+            "d5"
+          ]
+        },
+        "export": {
+          "status": "ok",
+          "drawer_count": 7,
+          "warnings": []
+        },
+        "import": {
+          "status": "ok",
+          "imported_drawer_count": 7
+        },
+        "validate": {
+          "status": "ok",
+          "drawer_match": null,
+          "document_match_ratio": null,
+          "metadata_match_ratio": null,
+          "error_count": 0,
+          "warning_count": 0
+        },
+        "integrity_crosscheck": {
+          "status": "ok",
+          "source_id_count": 7,
+          "target_id_count": 7,
+          "missing_in_target": [],
+          "extra_in_target": [],
+          "content_mismatches": []
+        }
+      },
+      "outcome": "full_success",
+      "outcome_reason": "all stages passed cleanly",
+      "root_cause_class": null,
+      "error_message": null,
+      "traceback": null
+    }
+  ]
+}
