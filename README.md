@@ -1,26 +1,21 @@
 # MemPalace MCP Bridge for VS Code Copilot
 
-Reliable integration layer for running MemPalace as a guarded local MCP memory backend in VS Code Copilot Chat.
+Integration layer for running MemPalace as a guarded local MCP backend in VS Code Copilot Chat on the stable ChromaDB `0.6.x` line.
 
 ---
 
 ## What this repo is
 
 - An **integration layer** between MemPalace and VS Code Copilot Chat
-- A **reproducible setup path** for local MCP-backed memory
+- A **reproducible setup** for local MCP-backed memory
 - A **guarded runtime** for the stable ChromaDB `0.6.x` line
-- A **verification layer** for checking that the bridge actually starts and reads the palace correctly
+- A **`verify.sh` path** that confirms the bridge starts and reads the palace correctly
 
 It is **not**:
 
 - the MemPalace engine itself
 - a generic experimentation repo
 - a ChromaDB `1.x` compatibility layer
-
-Stable release downloads:
-https://github.com/apajon/mempalace-mcp-bridge/releases
-
----
 
 ## Quickstart
 
@@ -32,19 +27,8 @@ bash verify.sh
 code .
 ```
 
-Important:
-
 - Open the repository root folder in VS Code. Opening a subfolder prevents MCP from loading.
-- `verify.sh` should report one of:
-  - **SUPPORTED and healthy**
-  - **SUPPORTED but suspicious**
-  - **UNSUPPORTED or unsafe**
-
-After setup, open Copilot Chat and ask:
-
-```text
-What do you remember about me?
-```
+- `verify.sh` should report **SUPPORTED and healthy** before you rely on the bridge.
 
 ---
 
@@ -68,8 +52,6 @@ This repository intentionally targets the tested ChromaDB `0.6.x` line:
 - stable path: **ChromaDB `0.6.x` only**
 - ChromaDB `1.x`: **not supported on the stable path**
 
-This is intentional.
-
 The stable path prioritizes:
 
 - preservation of existing palaces
@@ -77,7 +59,7 @@ The stable path prioritizes:
 - guarded execution
 - reproducible local behavior
 
-`main` fails fast when the active runtime is outside the supported stable line.
+If the active runtime is outside the supported line, the guarded path is expected to fail.
 
 ---
 
@@ -90,13 +72,19 @@ Use this repo if:
 - you want verification before relying on the bridge
 - you already depend on existing palaces and want the stable `0.6.x` path
 
-This repo is not aimed at users who primarily want to experiment with ChromaDB `1.x`.
+Do not use this repo as your main path if your goal is ChromaDB `1.x` experimentation.
 
 ---
 
 ## Advanced usage
 
-Advanced material exists, but it is secondary to the stable bridge path.
+Advanced material is secondary to the stable bridge path.
+
+Mine your own data:
+
+```bash
+uv run --directory . mempalace mine /path/to/your/project
+```
 
 - Structured memory patterns: [docs/advanced_memory_strategy.md](docs/advanced_memory_strategy.md)
 - Architecture overview: [docs/architecture.md](docs/architecture.md)
@@ -105,19 +93,13 @@ Advanced material exists, but it is secondary to the stable bridge path.
 - Troubleshooting: [docs/troubleshooting.md](docs/troubleshooting.md)
 - Update and verify workflow: [docs/update_workflow.md](docs/update_workflow.md)
 
-To mine your own data after setup:
-
-```bash
-uv run --directory . mempalace mine /path/to/your/project
-```
-
 ---
 
 ## Experimental: reconstruction workflow
 
-The repository includes a separate `0.6.x` -> `1.x` reconstruction workflow.
+This repo includes a separate `0.6.x` -> `1.x` reconstruction workflow.
 
-Its status is:
+Status:
 
 - **experimental**
 - **not part of the supported bridge path**
@@ -125,17 +107,6 @@ Its status is:
 - **not a supported upgrade path**
 
 Use it only for source-preserving evaluation with a disposable target.
-
-Entry point:
-
-```bash
-./scripts/reconstruct.sh \
-  --source-palace ~/.mempalace/palace \
-  --target-palace /tmp/palace-target \
-  --work-dir /tmp/palace-reconstruction-run \
-  --source-python .venv/bin/python \
-  --target-python .venv-chromadb1/bin/python
-```
 
 Documentation:
 
@@ -161,14 +132,12 @@ Do **not** treat this as evidence that ChromaDB `1.x` is supported by the bridge
 
 - reproducible setup
 - MCP integration for VS Code Copilot Chat
-- guarded runtime behavior
+- guarded runtime
 - verification
 - stable `0.6.x` compatibility policy
 
 If you want the underlying memory system, use MemPalace itself:
 https://github.com/milla-jovovich/mempalace
-
-If you want a reliable way to run it in VS Code Copilot Chat, use this repo.
 
 ---
 
@@ -179,6 +148,11 @@ If you want a reliable way to run it in VS Code Copilot Chat, use this repo.
 - The stable bridge path does **not** support ChromaDB `1.x`
 - Reconstruction can validate rebuilt targets experimentally, but that still does **not** make `1.x` a supported bridge target
 - Automatic migration to ChromaDB `1.x` is not supported here
+
+---
+
+Stable release downloads:
+https://github.com/apajon/mempalace-mcp-bridge/releases
 
 ---
 
