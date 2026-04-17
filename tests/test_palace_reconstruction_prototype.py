@@ -8,31 +8,30 @@ import tempfile
 import unittest
 from pathlib import Path
 
-
 SCRIPTS_DIR = Path(__file__).resolve().parents[1] / "scripts"
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
-from palace_reconstruction_prototype import (  # type: ignore
+from palace_reconstruction_prototype import (
+    COLLECTION_NAME,  # type: ignore
     DRAWERS_FILENAME,
     EXPORT_MANIFEST_FILENAME,
     MCP_RUNTIME_DEBUG_FILENAME,
-    RETRIEVAL_QUERIES_FILENAME,
     RETRIEVAL_DEBUG_FILENAME,
+    RETRIEVAL_QUERIES_FILENAME,
     TARGET_MANIFEST_FILENAME,
-    USAGE_SCENARIOS_FILENAME,
     USAGE_DEBUG_FILENAME,
+    USAGE_SCENARIOS_FILENAME,
     VALIDATION_DEBUG_FILENAME,
-    COLLECTION_NAME,
     ReconstructionCliError,
-    compare_usage_results,
     compare_retrieval_results,
+    compare_usage_results,
     export_drawers,
     extract_drawers_from_sqlite,
     import_drawers,
-    record_usage_results,
     record_retrieval_results,
+    record_usage_results,
     summarize_drawers,
     validate_mcp_runtime,
     validate_reconstruction,
@@ -55,9 +54,7 @@ class PalaceReconstructionPrototypeTests(unittest.TestCase):
             "compatibility_line": "chromadb-0.6.x",
             "chromadb_version": "0.6.3",
         }
-        (palace / "mempalace-bridge-manifest.json").write_text(
-            json.dumps(manifest), encoding="utf-8"
-        )
+        (palace / "mempalace-bridge-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
 
         conn = sqlite3.connect(palace / "chroma.sqlite3")
         cur = conn.cursor()
@@ -148,9 +145,7 @@ class PalaceReconstructionPrototypeTests(unittest.TestCase):
             "compatibility_line": "chromadb-0.6.x",
             "chromadb_version": "0.6.3",
         }
-        (palace / "mempalace-bridge-manifest.json").write_text(
-            json.dumps(manifest), encoding="utf-8"
-        )
+        (palace / "mempalace-bridge-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
 
         if rows is None:
             rows = [
@@ -712,7 +707,9 @@ class PalaceReconstructionPrototypeTests(unittest.TestCase):
             metadatas=[{"wing": "proj", "room": "misc", "chunk_index": 9}],
         )
 
-        result = self._run_prototype_script("validate", "--export-dir", str(export_dir), "--target-palace", str(target))
+        result = self._run_prototype_script(
+            "validate", "--export-dir", str(export_dir), "--target-palace", str(target)
+        )
 
         combined_output = result.stdout + result.stderr
         debug_path = export_dir / VALIDATION_DEBUG_FILENAME
@@ -794,9 +791,7 @@ class PalaceReconstructionPrototypeTests(unittest.TestCase):
         palace = self.root / "corrupted-palace"
         palace.mkdir(parents=True, exist_ok=True)
         manifest = {"compatibility_line": "chromadb-0.6.x", "chromadb_version": "0.6.3"}
-        (palace / "mempalace-bridge-manifest.json").write_text(
-            json.dumps(manifest), encoding="utf-8"
-        )
+        (palace / "mempalace-bridge-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
         (palace / "chroma.sqlite3").write_bytes(b"NOT A DATABASE FILE AT ALL")
 
         with self.assertRaises(ReconstructionCliError) as ctx:
@@ -809,9 +804,7 @@ class PalaceReconstructionPrototypeTests(unittest.TestCase):
         palace = self.root / "wrong-schema-palace"
         palace.mkdir(parents=True, exist_ok=True)
         manifest = {"compatibility_line": "chromadb-0.6.x", "chromadb_version": "0.6.3"}
-        (palace / "mempalace-bridge-manifest.json").write_text(
-            json.dumps(manifest), encoding="utf-8"
-        )
+        (palace / "mempalace-bridge-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
         conn = sqlite3.connect(palace / "chroma.sqlite3")
         conn.execute("CREATE TABLE not_embeddings (id INTEGER PRIMARY KEY, data TEXT)")
         conn.commit()
@@ -827,9 +820,7 @@ class PalaceReconstructionPrototypeTests(unittest.TestCase):
         palace = self.root / "corrupted-export"
         palace.mkdir(parents=True, exist_ok=True)
         manifest = {"compatibility_line": "chromadb-0.6.x", "chromadb_version": "0.6.3"}
-        (palace / "mempalace-bridge-manifest.json").write_text(
-            json.dumps(manifest), encoding="utf-8"
-        )
+        (palace / "mempalace-bridge-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
         (palace / "chroma.sqlite3").write_bytes(b"GARBAGE BYTES")
         export_dir = self.root / "corrupted-export-out"
 
@@ -842,9 +833,7 @@ class PalaceReconstructionPrototypeTests(unittest.TestCase):
         palace = self.root / "wrong-schema-export"
         palace.mkdir(parents=True, exist_ok=True)
         manifest = {"compatibility_line": "chromadb-0.6.x", "chromadb_version": "0.6.3"}
-        (palace / "mempalace-bridge-manifest.json").write_text(
-            json.dumps(manifest), encoding="utf-8"
-        )
+        (palace / "mempalace-bridge-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
         conn = sqlite3.connect(palace / "chroma.sqlite3")
         conn.execute("CREATE TABLE wrong_table (id INTEGER PRIMARY KEY)")
         conn.commit()
@@ -855,6 +844,47 @@ class PalaceReconstructionPrototypeTests(unittest.TestCase):
             export_drawers(palace, export_dir)
         self.assertEqual(ctx.exception.stage, "export")
         self.assertEqual(ctx.exception.category, "structural")
+
+    # -- CLI error UX tests --
+
+    def test_cli_corrupted_sqlite_shows_structured_error_no_traceback(self) -> None:
+        palace = self.root / "cli-corrupted"
+        palace.mkdir(parents=True, exist_ok=True)
+        manifest = {"compatibility_line": "chromadb-0.6.x", "chromadb_version": "0.6.3"}
+        (palace / "mempalace-bridge-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+        (palace / "chroma.sqlite3").write_bytes(b"NOT A DATABASE")
+        export_dir = self.root / "cli-corrupted-out"
+        result = self._run_prototype_script("export", "--source-palace", str(palace), "--output-dir", str(export_dir))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("[ERROR]", result.stderr)
+        self.assertIn("Category: structural", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+
+    def test_cli_debug_shows_traceback(self) -> None:
+        palace = self.root / "cli-debug"
+        palace.mkdir(parents=True, exist_ok=True)
+        manifest = {"compatibility_line": "chromadb-0.6.x", "chromadb_version": "0.6.3"}
+        (palace / "mempalace-bridge-manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+        (palace / "chroma.sqlite3").write_bytes(b"NOT A DATABASE")
+        export_dir = self.root / "cli-debug-out"
+        result = self._run_prototype_script(
+            "--debug", "export", "--source-palace", str(palace), "--output-dir", str(export_dir)
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Traceback", result.stderr)
+        self.assertIn("ReconstructionCliError", result.stderr)
+
+    def test_cli_runtime_error_shows_hint_no_traceback(self) -> None:
+        # Trigger a RuntimeError by providing an invalid export bundle for import
+        export_dir = self.root / "bad-bundle"
+        export_dir.mkdir(parents=True, exist_ok=True)
+        (export_dir / "reconstruction-manifest.json").write_text("{}", encoding="utf-8")
+        target = self.root / "cli-runtime-target"
+        result = self._run_prototype_script("import", "--export-dir", str(export_dir), "--target-palace", str(target))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("[ERROR]", result.stderr)
+        self.assertIn("--debug", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
 
 
 if __name__ == "__main__":

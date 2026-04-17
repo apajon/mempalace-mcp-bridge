@@ -17,6 +17,7 @@ MCP_LAUNCHER="$DEFAULT_MCP_LAUNCHER"
 WITH_USAGE=false
 WITH_MCP_RUNTIME=false
 DRY_RUN=false
+DEBUG=false
 
 STEP_INDEX=0
 TOTAL_STEPS=6
@@ -51,6 +52,7 @@ Optional:
   --mcp-launcher-script PATH Launcher script used with --with-mcp-runtime.
                              Default: scripts/run_mcp_server_exploration.py
   --dry-run                  Print the pipeline without executing it.
+  --debug                    Pass --debug to the reconstruction script for full tracebacks.
   --help                     Show this help text.
 
 Notes:
@@ -141,6 +143,10 @@ while [ "$#" -gt 0 ]; do
             DRY_RUN=true
             shift
             ;;
+        --debug)
+            DEBUG=true
+            shift
+            ;;
         --help|-h)
             usage
             exit 0
@@ -213,15 +219,22 @@ run_step() {
     STEP_INDEX=$((STEP_INDEX + 1))
     CURRENT_STEP="$step_label"
 
+    # Inject --debug before the subcommand arguments when DEBUG is enabled.
+    local cmd=("$@")
+    if [ "$DEBUG" = true ]; then
+        # Insert --debug after the script path (position 2) and before subcommand args.
+        cmd=("${cmd[0]}" "${cmd[1]}" "--debug" "${cmd[@]:2}")
+    fi
+
     info "Step $STEP_INDEX/$TOTAL_STEPS — $step_label"
-    info "Command: $(quote_command "$@")"
+    info "Command: $(quote_command "${cmd[@]}")"
 
     if [ "$DRY_RUN" = true ]; then
         echo ""
         return 0
     fi
 
-    "$@"
+    "${cmd[@]}"
     ok "Completed step $STEP_INDEX/$TOTAL_STEPS"
     echo ""
 }
@@ -237,6 +250,9 @@ info "Source Python: $SOURCE_PYTHON"
 info "Target Python: $TARGET_PYTHON"
 info "Usage validation: $WITH_USAGE"
 info "MCP runtime validation: $WITH_MCP_RUNTIME"
+if [ "$DEBUG" = true ]; then
+    info "Debug mode: true"
+fi
 if [ "$DRY_RUN" = true ]; then
     info "Dry run: true"
 fi

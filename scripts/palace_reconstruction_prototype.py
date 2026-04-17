@@ -21,7 +21,6 @@ from typing import Any
 
 from palace_format_detector import CLASS_CHROMA_0_6, detect_palace_format
 
-
 EXPORT_MANIFEST_FILENAME = "reconstruction-export-manifest.json"
 DRAWERS_FILENAME = "drawers.jsonl"
 TARGET_MANIFEST_FILENAME = "reconstruction-target-manifest.json"
@@ -282,12 +281,7 @@ def _make_query_text(document: str) -> str | None:
 
 def _is_safe_bundle_relative_path(value: str) -> bool:
     path = Path(value)
-    return (
-        bool(value)
-        and not path.is_absolute()
-        and ".." not in path.parts
-        and "." not in path.parts
-    )
+    return bool(value) and not path.is_absolute() and ".." not in path.parts and "." not in path.parts
 
 
 def _validate_drawer_record(drawer: Any, *, line_number: int) -> dict[str, Any]:
@@ -339,9 +333,7 @@ def _normalize_bundle_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
     for required_file in ("drawers", "retrieval_queries", "usage_scenarios"):
         file_value = files.get(required_file)
         if not isinstance(file_value, str) or not _is_safe_bundle_relative_path(file_value):
-            raise RuntimeError(
-                f"Export manifest files.{required_file} must be a safe relative bundle path"
-            )
+            raise RuntimeError(f"Export manifest files.{required_file} must be a safe relative bundle path")
     normalized["files"] = files
 
     collection = normalized.get("collection")
@@ -355,10 +347,7 @@ def _normalize_bundle_manifest(manifest: dict[str, Any]) -> dict[str, Any]:
     collection_metadata = collection.get("metadata", DEFAULT_COLLECTION_METADATA)
     normalized_metadata, metadata_issues = _normalize_metadata(collection_metadata)
     if metadata_issues:
-        raise RuntimeError(
-            "Export manifest collection.metadata is invalid: "
-            + "; ".join(metadata_issues)
-        )
+        raise RuntimeError("Export manifest collection.metadata is invalid: " + "; ".join(metadata_issues))
     normalized["collection"] = {
         "name": collection_name,
         "metadata": normalized_metadata,
@@ -504,9 +493,7 @@ def _analyze_drawers(drawers: list[dict[str, Any]]) -> dict[str, Any]:
         "ids": sorted(id_counts),
         "sample_ids": valid_ids_in_order[:SAMPLE_ID_COUNT],
         "metadata_keys": sorted(metadata_keys),
-        "wing_room_counts": {
-            wing: dict(sorted(rooms.items())) for wing, rooms in sorted(wing_room_counts.items())
-        },
+        "wing_room_counts": {wing: dict(sorted(rooms.items())) for wing, rooms in sorted(wing_room_counts.items())},
         "id_integrity": {
             "unique_id_count": len(id_counts),
             "duplicate_ids": duplicate_ids,
@@ -827,9 +814,7 @@ def _source_sqlite_integrity(db_path: Path) -> dict[str, Any]:
             "duplicate_ids": duplicate_ids,
             "document_row_issues": document_row_issues,
             "duplicate_metadata_keys": duplicate_metadata_keys,
-            "valid": not any(
-                [blank_id_rows, duplicate_ids, document_row_issues, duplicate_metadata_keys]
-            ),
+            "valid": not any([blank_id_rows, duplicate_ids, document_row_issues, duplicate_metadata_keys]),
         }
     except sqlite3.Error as exc:
         _raise_cli_error(
@@ -859,13 +844,10 @@ def _bundle_integrity_issues(manifest: dict[str, Any], analysis: dict[str, Any])
         issues.append(f"duplicate drawer ids in export bundle: {_preview_items(id_integrity['duplicate_ids'])}")
     if content_integrity["non_string_document_ids"]:
         issues.append(
-            "non-string documents in export bundle: "
-            f"{_preview_items(content_integrity['non_string_document_ids'])}"
+            "non-string documents in export bundle: " f"{_preview_items(content_integrity['non_string_document_ids'])}"
         )
     if content_integrity["empty_document_ids"]:
-        issues.append(
-            f"empty documents in export bundle: {_preview_items(content_integrity['empty_document_ids'])}"
-        )
+        issues.append(f"empty documents in export bundle: {_preview_items(content_integrity['empty_document_ids'])}")
     if metadata_integrity["structural_issue_ids"]:
         issues.append(
             "metadata structural issues in export bundle: "
@@ -896,7 +878,9 @@ def _bundle_integrity_issues(manifest: dict[str, Any], analysis: dict[str, Any])
     return issues
 
 
-def _fetch_collection_drawers(collection: Any, *, include_embeddings: bool) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def _fetch_collection_drawers(
+    collection: Any, *, include_embeddings: bool
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     include = ["documents", "metadatas"]
     if include_embeddings:
         include.append("embeddings")
@@ -949,8 +933,7 @@ def _source_export_issues(source_integrity: dict[str, Any], export_analysis: dic
         )
     if source_integrity["duplicate_ids"]:
         issues.append(
-            "duplicate source ids: "
-            f"{_preview_items([entry['id'] for entry in source_integrity['duplicate_ids']])}"
+            "duplicate source ids: " f"{_preview_items([entry['id'] for entry in source_integrity['duplicate_ids']])}"
         )
     if source_integrity["document_row_issues"]:
         issues.append(
@@ -1234,9 +1217,7 @@ def export_drawers(source_palace: Path, export_dir: Path) -> dict[str, Any]:
 def load_export_bundle(export_dir: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     manifest_path = export_dir / EXPORT_MANIFEST_FILENAME
     if not manifest_path.exists():
-        raise RuntimeError(
-            f"Export bundle is incomplete at {export_dir}; expected {EXPORT_MANIFEST_FILENAME}"
-        )
+        raise RuntimeError(f"Export bundle is incomplete at {export_dir}; expected {EXPORT_MANIFEST_FILENAME}")
 
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -1248,9 +1229,7 @@ def load_export_bundle(export_dir: Path) -> tuple[dict[str, Any], list[dict[str,
 
     drawers_path = export_dir / manifest["files"]["drawers"]
     if not drawers_path.exists():
-        raise RuntimeError(
-            f"Export bundle is incomplete at {export_dir}; expected {manifest['files']['drawers']}"
-        )
+        raise RuntimeError(f"Export bundle is incomplete at {export_dir}; expected {manifest['files']['drawers']}")
 
     drawers: list[dict[str, Any]] = []
     with drawers_path.open("r", encoding="utf-8") as handle:
@@ -1447,8 +1426,7 @@ class _McpStdioSession:
         if self.process.poll() is not None:
             stderr_preview = _preview_items(self._stderr_lines)
             raise RuntimeError(
-                f"MCP server exited during {context} with code {self.process.returncode}. "
-                f"stderr: {stderr_preview}"
+                f"MCP server exited during {context} with code {self.process.returncode}. " f"stderr: {stderr_preview}"
             )
 
     def request(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -1582,7 +1560,11 @@ def import_drawers(export_dir: Path, target_palace: Path) -> dict[str, Any]:
             category="data integrity",
             summary="export bundle failed integrity checks before import",
             details=export_issues,
-            where_to_look=[str(export_dir), str(export_dir / DRAWERS_FILENAME), str(export_dir / EXPORT_MANIFEST_FILENAME)],
+            where_to_look=[
+                str(export_dir),
+                str(export_dir / DRAWERS_FILENAME),
+                str(export_dir / EXPORT_MANIFEST_FILENAME),
+            ],
             suggested_action="Inspect the bundle manifest and drawers file for the listed issues, then regenerate the bundle from a clean source palace.",
         )
     load_retrieval_query_plan_from_bundle(export_dir, manifest)
@@ -1998,9 +1980,7 @@ def compare_retrieval_results(
 
     source_query_ids = sorted(source_index)
     target_query_ids = sorted(target_index)
-    query_plan_matches = (
-        source_query_ids == target_query_ids and source_bundle["top_k"] == target_bundle["top_k"]
-    )
+    query_plan_matches = source_query_ids == target_query_ids and source_bundle["top_k"] == target_bundle["top_k"]
 
     compared_queries: list[dict[str, Any]] = []
     all_source_results_present = True
@@ -2042,13 +2022,9 @@ def compare_retrieval_results(
         if source_has_results and not target_anchor_present:
             mismatches.append("target did not retrieve anchor id")
         if not counts_within_tolerance:
-            mismatches.append(
-                f"result count difference {count_difference} exceeds tolerance {count_tolerance}"
-            )
+            mismatches.append(f"result count difference {count_difference} exceeds tolerance {count_tolerance}")
         if source_has_results and not overlap_meets_threshold:
-            mismatches.append(
-                f"source overlap ratio {source_coverage} is below threshold {min_overlap_ratio}"
-            )
+            mismatches.append(f"source overlap ratio {source_coverage} is below threshold {min_overlap_ratio}")
 
         compared_queries.append(
             {
@@ -2212,14 +2188,10 @@ def compare_usage_results(
                 mismatches.append("target did not retrieve anchor id")
                 scenario_has_degraded_mismatch = True
             if not counts_within_tolerance:
-                mismatches.append(
-                    f"result count difference {count_difference} exceeds tolerance {count_tolerance}"
-                )
+                mismatches.append(f"result count difference {count_difference} exceeds tolerance {count_tolerance}")
                 scenario_has_degraded_mismatch = True
             if source_has_results and not overlap_meets_threshold:
-                mismatches.append(
-                    f"source overlap ratio {source_overlap} is below threshold {min_overlap_ratio}"
-                )
+                mismatches.append(f"source overlap ratio {source_overlap} is below threshold {min_overlap_ratio}")
                 if overlap_count == 0:
                     scenario_has_unusable_mismatch = True
                 else:
@@ -2450,9 +2422,7 @@ def validate_mcp_runtime(
 
         tools_response = session.request({"jsonrpc": "2.0", "id": "tools-list", "method": "tools/list"})
         if "error" in tools_response:
-            raise RuntimeError(
-                f"MCP tools/list failed: {tools_response['error'].get('message', 'unknown error')}"
-            )
+            raise RuntimeError(f"MCP tools/list failed: {tools_response['error'].get('message', 'unknown error')}")
         tools = tools_response.get("result", {}).get("tools", [])
         if not isinstance(tools, list):
             raise RuntimeError("MCP tools/list returned an invalid tools payload")
@@ -2873,41 +2843,29 @@ def _print_export_result(manifest: dict[str, Any], export_dir: Path) -> None:
     )
     retrieval = manifest.get("retrieval_validation", {})
     if retrieval:
-        print(
-            f"[INFO]  Retrieval queries: {retrieval.get('query_count')} "
-            f"(top_k={retrieval.get('top_k')})"
-        )
+        print(f"[INFO]  Retrieval queries: {retrieval.get('query_count')} " f"(top_k={retrieval.get('top_k')})")
     usage = manifest.get("usage_validation", {})
     if usage:
-        print(
-            f"[INFO]  Usage scenarios: {usage.get('scenario_count')} "
-            f"(top_k={usage.get('top_k')})"
-        )
+        print(f"[INFO]  Usage scenarios: {usage.get('scenario_count')} " f"(top_k={usage.get('top_k')})")
     if manifest["warnings"]:
         for warning in manifest["warnings"]:
             print(f"[WARN]  {warning}")
 
 
 def _print_import_result(target_manifest: dict[str, Any], target_palace: Path) -> None:
-    print(
-        f"[OK]    Imported {target_manifest['target']['imported_drawer_count']} drawers into {target_palace}"
-    )
+    print(f"[OK]    Imported {target_manifest['target']['imported_drawer_count']} drawers into {target_palace}")
     for warning in target_manifest["warnings"]:
         print(f"[WARN]  {warning}")
 
 
 def _print_retrieval_record_result(result: dict[str, Any], output_path: Path) -> None:
-    print(
-        f"[OK]    Recorded retrieval results for {result['query_count']} queries to {output_path}"
-    )
+    print(f"[OK]    Recorded retrieval results for {result['query_count']} queries to {output_path}")
     print(f"[INFO]  Label: {result['label']}")
     print(f"[INFO]  Palace: {result['palace_path']}")
 
 
 def _print_usage_record_result(result: dict[str, Any], output_path: Path) -> None:
-    print(
-        f"[OK]    Recorded usage results for {result['scenario_count']} scenarios to {output_path}"
-    )
+    print(f"[OK]    Recorded usage results for {result['scenario_count']} scenarios to {output_path}")
     print(f"[INFO]  Label: {result['label']}")
     print(f"[INFO]  Palace: {result['palace_path']}")
 
@@ -2924,9 +2882,7 @@ def _print_validation_result(result: dict[str, Any]) -> None:
         print(f"{prefix} {check_name}", file=stream)
 
     diagnostics = result["diagnostics"]
-    print(
-        f"[INFO]  Drawer counts: expected={result['expected_drawer_count']} actual={result['actual_drawer_count']}"
-    )
+    print(f"[INFO]  Drawer counts: expected={result['expected_drawer_count']} actual={result['actual_drawer_count']}")
     print(
         "[INFO]  Content chars: "
         f"expected_total={diagnostics['content']['expected_length_profile']['total_chars']} "
@@ -2962,9 +2918,7 @@ def _print_validation_result(result: dict[str, Any]) -> None:
 
     embeddings = diagnostics["embeddings"]
     if embeddings["checked"]:
-        print(
-            f"[INFO]  Embeddings present: {embeddings['present_count']}/{embeddings['checked_count']}"
-        )
+        print(f"[INFO]  Embeddings present: {embeddings['present_count']}/{embeddings['checked_count']}")
     elif not embeddings["accessible"]:
         print(f"[INFO]  Embedding check skipped: {embeddings['reason']}")
 
@@ -3034,9 +2988,7 @@ def _print_mcp_runtime_result(result: dict[str, Any]) -> None:
         stream = sys.stdout if passed else sys.stderr
         print(f"{prefix} {check_name}", file=stream)
 
-    print(
-        f"[INFO]  Launcher: {result['python_executable']} {result['launcher_script']}"
-    )
+    print(f"[INFO]  Launcher: {result['python_executable']} {result['launcher_script']}")
     print(f"[INFO]  Palace: {result['palace_path']}")
 
     diagnostics = result["diagnostics"]
@@ -3075,11 +3027,7 @@ def _print_usage_comparison_result(result: dict[str, Any]) -> None:
         print("[ERROR] Usage comparison detected divergence", file=sys.stderr)
 
     for check_name, passed in result["checks"].items():
-        warning = (
-            not passed
-            and result["recommendation"] == USAGE_ACCEPTABLE
-            and check_name.startswith("source_")
-        )
+        warning = not passed and result["recommendation"] == USAGE_ACCEPTABLE and check_name.startswith("source_")
         if warning:
             prefix = "[WARN] "
             stream = sys.stdout
@@ -3132,9 +3080,14 @@ def _print_usage_comparison_result(result: dict[str, Any]) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
-            "Exploration-only non-destructive reconstruction prototype for exporting a "
+            "Non-destructive reconstruction tool for exporting a "
             "chroma_0_6 palace and rebuilding it into a separate target."
         )
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Show full tracebacks on failure instead of concise error messages",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -3170,7 +3123,9 @@ def main() -> int:
         required=True,
         help="Path to write the retrieval results JSON artifact",
     )
-    record_retrieval_parser.add_argument("--label", required=True, help="Label for this result set, e.g. source or target")
+    record_retrieval_parser.add_argument(
+        "--label", required=True, help="Label for this result set, e.g. source or target"
+    )
     record_retrieval_parser.add_argument("--json", action="store_true", help="Print JSON result")
 
     compare_retrieval_parser = subparsers.add_parser(
@@ -3373,10 +3328,30 @@ def main() -> int:
             _print_validation_result(result)
         return 0 if result["valid"] else 1
     except ReconstructionCliError as exc:
-        _print_cli_error(exc)
+        if args.debug:
+            import traceback
+
+            traceback.print_exc(file=sys.stderr)
+        else:
+            _print_cli_error(exc)
         return 1
     except RuntimeError as exc:
-        print(f"[ERROR] {exc}", file=sys.stderr)
+        if args.debug:
+            import traceback
+
+            traceback.print_exc(file=sys.stderr)
+        else:
+            print(f"[ERROR] {exc}", file=sys.stderr)
+            print("[INFO]  Run with --debug for full traceback.", file=sys.stderr)
+        return 1
+    except Exception as exc:
+        if args.debug:
+            import traceback
+
+            traceback.print_exc(file=sys.stderr)
+        else:
+            print(f"[ERROR] Unexpected failure: {exc}", file=sys.stderr)
+            print("[INFO]  Run with --debug for full traceback.", file=sys.stderr)
         return 1
 
 
