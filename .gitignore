@@ -41,3 +41,13 @@ Thumbs.db
 *.vc.db
 *.vc.db-shm
 *.vc.db-wal
+
+# Machine-specific editor config
+.vscode/c_cpp_properties.json
+
+# MemPalace local runtime files
+entities.json
+mempalace.yaml
+
+# Extra virtual environments (investigation / experimentation)
+.venv-*/
