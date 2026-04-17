@@ -149,6 +149,22 @@ The repo contains a non-destructive reconstruction prototype for exporting a sta
 palace, rebuilding it into a separate `1.x` target, and validating the result. That prototype is
 useful for investigation, but it is **not supported bridge functionality**.
 
+For advanced evaluators, the experimental workflow now also has a single reproducible entrypoint:
+
+```bash
+./scripts/reconstruct.sh \
+  --source-palace ~/.mempalace/palace \
+  --target-palace /tmp/palace-target \
+  --work-dir /tmp/palace-reconstruction-run \
+  --source-python .venv/bin/python \
+  --target-python .venv-chromadb1/bin/python
+```
+
+Add `--with-usage` and `--with-mcp-runtime` for the broader experimental checks, or `--dry-run`
+to print the exact pipeline without running it. See
+[`docs/chromadb_reconstruction_prototype.md`](docs/chromadb_reconstruction_prototype.md) for the
+full flow, sample output, and failure examples.
+
 ### What is guaranteed
 
 - the stable bridge path remains pinned to ChromaDB `0.6.x`
