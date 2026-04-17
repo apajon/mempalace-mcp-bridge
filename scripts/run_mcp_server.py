@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import runpy
 import sys
+from pathlib import Path
 
 from check_chromadb_version import get_unsupported_reason
-from palace_safety_gate import evaluate_palace_safety
-from pathlib import Path
 from mempalace.config import MempalaceConfig
+from palace_safety_gate import evaluate_palace_safety
+from runtime_compat import diagnose
 
 
 def main() -> int:
@@ -21,6 +22,12 @@ def main() -> int:
     gate = evaluate_palace_safety(palace_path, "read")
     if not gate.allowed:
         print(f"[ERROR] {gate.message}", file=sys.stderr)
+        return 1
+
+    diag = diagnose(palace_path)
+    if not diag.compatible:
+        print(f"[ERROR] {diag.message}", file=sys.stderr)
+        print(f"        {diag.action}", file=sys.stderr)
         return 1
 
     runpy.run_module("mempalace.mcp_server", run_name="__main__")
