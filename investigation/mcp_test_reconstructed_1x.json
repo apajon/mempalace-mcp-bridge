@@ -1,0 +1,820 @@
+{
+  "palace_path": "/tmp/rich-migration-test-20996/reconstructed-1x",
+  "python": "/home/adrienpagon/git/mempalace-mcp-bridge/.venv-chromadb1/bin/python",
+  "total_time_ms": 1918.7,
+  "exit_code": 0,
+  "stderr": "[INFO]  palace_format=1.x runtime=1.5.7 (1.x)\nMemPalace MCP Server starting...\n\u001b[0;93m2026-04-17 14:28:19.226672402 [W:onnxruntime:Default, device_discovery.cc:325 DiscoverDevicesForPlatform] GPU device discovery failed: device_discovery.cc:92 ReadFileContents Failed to open file: \"/sys/class/drm/card0/device/vendor\"\u001b[m\n",
+  "phases": {
+    "initialize": {
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "result": {
+          "protocolVersion": "2024-11-05",
+          "capabilities": {
+            "tools": {}
+          },
+          "serverInfo": {
+            "name": "mempalace",
+            "version": "3.3.0"
+          }
+        }
+      },
+      "latency_ms": 814.0
+    },
+    "tools_list": {
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "result": {
+          "tools": [
+            {
+              "name": "mempalace_status",
+              "description": "Palace overview — total drawers, wing and room counts",
+              "inputSchema": {
+                "type": "object",
+                "properties": {}
+              }
+            },
+            {
+              "name": "mempalace_list_wings",
+              "description": "List all wings with drawer counts",
+              "inputSchema": {
+                "type": "object",
+                "properties": {}
+              }
+            },
+            {
+              "name": "mempalace_list_rooms",
+              "description": "List rooms within a wing (or all rooms if no wing given)",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "wing": {
+                    "type": "string",
+                    "description": "Wing to list rooms for (optional)"
+                  }
+                }
+              }
+            },
+            {
+              "name": "mempalace_get_taxonomy",
+              "description": "Full taxonomy: wing → room → drawer count",
+              "inputSchema": {
+                "type": "object",
+                "properties": {}
+              }
+            },
+            {
+              "name": "mempalace_get_aaak_spec",
+              "description": "Get the AAAK dialect specification — the compressed memory format MemPalace uses. Call this if you need to read or write AAAK-compressed memories.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {}
+              }
+            },
+            {
+              "name": "mempalace_kg_query",
+              "description": "Query the knowledge graph for an entity's relationships. Returns typed facts with temporal validity. E.g. 'Max' → child_of Alice, loves chess, does swimming. Filter by date with as_of to see what was true at a point in time.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "entity": {
+                    "type": "string",
+                    "description": "Entity to query (e.g. 'Max', 'MyProject', 'Alice')"
+                  },
+                  "as_of": {
+                    "type": "string",
+                    "description": "Date filter — only facts valid at this date (YYYY-MM-DD, optional)"
+                  },
+                  "direction": {
+                    "type": "string",
+                    "description": "outgoing (entity→?), incoming (?→entity), or both (default: both)"
+                  }
+                },
+                "required": [
+                  "entity"
+                ]
+              }
+            },
+            {
+              "name": "mempalace_kg_add",
+              "description": "Add a fact to the knowledge graph. Subject → predicate → object with optional time window. E.g. ('Max', 'started_school', 'Year 7', valid_from='2026-09-01').",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "subject": {
+                    "type": "string",
+                    "description": "The entity doing/being something"
+                  },
+                  "predicate": {
+                    "type": "string",
+                    "description": "The relationship type (e.g. 'loves', 'works_on', 'daughter_of')"
+                  },
+                  "object": {
+                    "type": "string",
+                    "description": "The entity being connected to"
+                  },
+                  "valid_from": {
+                    "type": "string",
+                    "description": "When this became true (YYYY-MM-DD, optional)"
+                  },
+                  "source_closet": {
+                    "type": "string",
+                    "description": "Closet ID where this fact appears (optional)"
+                  }
+                },
+                "required": [
+                  "subject",
+                  "predicate",
+                  "object"
+                ]
+              }
+            },
+            {
+              "name": "mempalace_kg_invalidate",
+              "description": "Mark a fact as no longer true. E.g. ankle injury resolved, job ended, moved house.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "subject": {
+                    "type": "string",
+                    "description": "Entity"
+                  },
+                  "predicate": {
+                    "type": "string",
+                    "description": "Relationship"
+                  },
+                  "object": {
+                    "type": "string",
+                    "description": "Connected entity"
+                  },
+                  "ended": {
+                    "type": "string",
+                    "description": "When it stopped being true (YYYY-MM-DD, default: today)"
+                  }
+                },
+                "required": [
+                  "subject",
+                  "predicate",
+                  "object"
+                ]
+              }
+            },
+            {
+              "name": "mempalace_kg_timeline",
+              "description": "Chronological timeline of facts. Shows the story of an entity (or everything) in order.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "entity": {
+                    "type": "string",
+                    "description": "Entity to get timeline for (optional — omit for full timeline)"
+                  }
+                }
+              }
+            },
+            {
+              "name": "mempalace_kg_stats",
+              "description": "Knowledge graph overview: entities, triples, current vs expired facts, relationship types.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {}
+              }
+            },
+            {
+              "name": "mempalace_traverse",
+              "description": "Walk the palace graph from a room. Shows connected ideas across wings — the tunnels. Like following a thread through the palace: start at 'chromadb-setup' in wing_code, discover it connects to wing_myproject (planning) and wing_user (feelings about it).",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "start_room": {
+                    "type": "string",
+                    "description": "Room to start from (e.g. 'chromadb-setup', 'riley-school')"
+                  },
+                  "max_hops": {
+                    "type": "integer",
+                    "description": "How many connections to follow (default: 2)"
+                  }
+                },
+                "required": [
+                  "start_room"
+                ]
+              }
+            },
+            {
+              "name": "mempalace_find_tunnels",
+              "description": "Find rooms that bridge two wings — the hallways connecting different domains. E.g. what topics connect wing_code to wing_team?",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "wing_a": {
+                    "type": "string",
+                    "description": "First wing (optional)"
+                  },
+                  "wing_b": {
+                    "type": "string",
+                    "description": "Second wing (optional)"
+                  }
+                }
+              }
+            },
+            {
+              "name": "mempalace_graph_stats",
+              "description": "Palace graph overview: total rooms, tunnel connections, edges between wings.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {}
+              }
+            },
+            {
+              "name": "mempalace_create_tunnel",
+              "description": "Create a cross-wing tunnel linking two palace locations. Use when content in one project relates to another — e.g., an API design in project_api connects to a database schema in project_database.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "source_wing": {
+                    "type": "string",
+                    "description": "Wing of the source"
+                  },
+                  "source_room": {
+                    "type": "string",
+                    "description": "Room in the source wing"
+                  },
+                  "target_wing": {
+                    "type": "string",
+                    "description": "Wing of the target"
+                  },
+                  "target_room": {
+                    "type": "string",
+                    "description": "Room in the target wing"
+                  },
+                  "label": {
+                    "type": "string",
+                    "description": "Description of the connection"
+                  },
+                  "source_drawer_id": {
+                    "type": "string",
+                    "description": "Optional specific drawer ID"
+                  },
+                  "target_drawer_id": {
+                    "type": "string",
+                    "description": "Optional specific drawer ID"
+                  }
+                },
+                "required": [
+                  "source_wing",
+                  "source_room",
+                  "target_wing",
+                  "target_room"
+                ]
+              }
+            },
+            {
+              "name": "mempalace_list_tunnels",
+              "description": "List all explicit cross-wing tunnels. Optionally filter by wing.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "wing": {
+                    "type": "string",
+                    "description": "Filter tunnels by wing (shows tunnels where wing is source or target)"
+                  }
+                }
+              }
+            },
+            {
+              "name": "mempalace_delete_tunnel",
+              "description": "Delete an explicit tunnel by its ID.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "tunnel_id": {
+                    "type": "string",
+                    "description": "Tunnel ID to delete"
+                  }
+                },
+                "required": [
+                  "tunnel_id"
+                ]
+              }
+            },
+            {
+              "name": "mempalace_follow_tunnels",
+              "description": "Follow tunnels from a room to see what it connects to in other wings. Returns connected rooms with drawer previews.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "wing": {
+                    "type": "string",
+                    "description": "Wing to start from"
+                  },
+                  "room": {
+                    "type": "string",
+                    "description": "Room to follow tunnels from"
+                  }
+                },
+                "required": [
+                  "wing",
+                  "room"
+                ]
+              }
+            },
+            {
+              "name": "mempalace_search",
+              "description": "Semantic search. Returns verbatim drawer content with similarity scores. IMPORTANT: 'query' must contain ONLY search keywords. Use 'context' for background. Results with cosine distance > max_distance are filtered out.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "query": {
+                    "type": "string",
+                    "description": "Short search query ONLY — keywords or a question. Max 250 chars.",
+                    "maxLength": 250
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "description": "Max results (default 5)",
+                    "minimum": 1,
+                    "maximum": 100
+                  },
+                  "wing": {
+                    "type": "string",
+                    "description": "Filter by wing (optional)"
+                  },
+                  "room": {
+                    "type": "string",
+                    "description": "Filter by room (optional)"
+                  },
+                  "max_distance": {
+                    "type": "number",
+                    "description": "Max cosine distance threshold (0=identical, 2=opposite). Results further than this are dropped. Lower = stricter. Default 1.5. Set to 0 to disable."
+                  },
+                  "context": {
+                    "type": "string",
+                    "description": "Background context for the search (optional). NOT used for embedding — only for future re-ranking."
+                  }
+                },
+                "required": [
+                  "query"
+                ]
+              }
+            },
+            {
+              "name": "mempalace_check_duplicate",
+              "description": "Check if content already exists in the palace before filing",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "content": {
+                    "type": "string",
+                    "description": "Content to check"
+                  },
+                  "threshold": {
+                    "type": "number",
+                    "description": "Similarity threshold 0-1 (default 0.9)"
+                  }
+                },
+                "required": [
+                  "content"
+                ]
+              }
+            },
+            {
+              "name": "mempalace_add_drawer",
+              "description": "File verbatim content into the palace. Checks for duplicates first.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "wing": {
+                    "type": "string",
+                    "description": "Wing (project name)"
+                  },
+                  "room": {
+                    "type": "string",
+                    "description": "Room (aspect: backend, decisions, meetings...)"
+                  },
+                  "content": {
+                    "type": "string",
+                    "description": "Verbatim content to store — exact words, never summarized"
+                  },
+                  "source_file": {
+                    "type": "string",
+                    "description": "Where this came from (optional)"
+                  },
+                  "added_by": {
+                    "type": "string",
+                    "description": "Who is filing this (default: mcp)"
+                  }
+                },
+                "required": [
+                  "wing",
+                  "room",
+                  "content"
+                ]
+              }
+            },
+            {
+              "name": "mempalace_delete_drawer",
+              "description": "Delete a drawer by ID. Irreversible.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "drawer_id": {
+                    "type": "string",
+                    "description": "ID of the drawer to delete"
+                  }
+                },
+                "required": [
+                  "drawer_id"
+                ]
+              }
+            },
+            {
+              "name": "mempalace_get_drawer",
+              "description": "Fetch a single drawer by ID — returns full content and metadata.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "drawer_id": {
+                    "type": "string",
+                    "description": "ID of the drawer to fetch"
+                  }
+                },
+                "required": [
+                  "drawer_id"
+                ]
+              }
+            },
+            {
+              "name": "mempalace_list_drawers",
+              "description": "List drawers with pagination. Optional wing/room filter. Returns IDs, wings, rooms, and content previews.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "wing": {
+                    "type": "string",
+                    "description": "Filter by wing (optional)"
+                  },
+                  "room": {
+                    "type": "string",
+                    "description": "Filter by room (optional)"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "description": "Max results per page (default 20, max 100)",
+                    "minimum": 1,
+                    "maximum": 100
+                  },
+                  "offset": {
+                    "type": "integer",
+                    "description": "Offset for pagination (default 0)",
+                    "minimum": 0
+                  }
+                }
+              }
+            },
+            {
+              "name": "mempalace_update_drawer",
+              "description": "Update an existing drawer's content and/or metadata (wing, room). Fetches existing drawer first; returns error if not found.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "drawer_id": {
+                    "type": "string",
+                    "description": "ID of the drawer to update"
+                  },
+                  "content": {
+                    "type": "string",
+                    "description": "New content (optional — omit to keep existing)"
+                  },
+                  "wing": {
+                    "type": "string",
+                    "description": "New wing (optional — omit to keep existing)"
+                  },
+                  "room": {
+                    "type": "string",
+                    "description": "New room (optional — omit to keep existing)"
+                  }
+                },
+                "required": [
+                  "drawer_id"
+                ]
+              }
+            },
+            {
+              "name": "mempalace_diary_write",
+              "description": "Write to your personal agent diary in AAAK format. Your observations, thoughts, what you worked on, what matters. Each agent has their own diary with full history. Write in AAAK for compression — e.g. 'SESSION:2026-04-04|built.palace.graph+diary.tools|ALC.req:agent.diaries.in.aaak|★★★'. Use entity codes from the AAAK spec.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "agent_name": {
+                    "type": "string",
+                    "description": "Your name — each agent gets their own diary wing"
+                  },
+                  "entry": {
+                    "type": "string",
+                    "description": "Your diary entry in AAAK format — compressed, entity-coded, emotion-marked"
+                  },
+                  "topic": {
+                    "type": "string",
+                    "description": "Topic tag (optional, default: general)"
+                  }
+                },
+                "required": [
+                  "agent_name",
+                  "entry"
+                ]
+              }
+            },
+            {
+              "name": "mempalace_diary_read",
+              "description": "Read your recent diary entries (in AAAK). See what past versions of yourself recorded — your journal across sessions.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "agent_name": {
+                    "type": "string",
+                    "description": "Your name — each agent gets their own diary wing"
+                  },
+                  "last_n": {
+                    "type": "integer",
+                    "description": "Number of recent entries to read (default: 10)"
+                  }
+                },
+                "required": [
+                  "agent_name"
+                ]
+              }
+            },
+            {
+              "name": "mempalace_hook_settings",
+              "description": "Get or set hook behavior. silent_save: True = save directly (no MCP clutter), False = legacy blocking. desktop_toast: True = show desktop notification. Call with no args to view.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {
+                  "silent_save": {
+                    "type": "boolean",
+                    "description": "True = silent direct save, False = blocking MCP calls"
+                  },
+                  "desktop_toast": {
+                    "type": "boolean",
+                    "description": "True = show desktop toast via notify-send"
+                  }
+                }
+              }
+            },
+            {
+              "name": "mempalace_memories_filed_away",
+              "description": "Check if a recent palace checkpoint was saved. Returns message count and timestamp.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {}
+              }
+            },
+            {
+              "name": "mempalace_reconnect",
+              "description": "Force reconnect to the palace database. Use after external scripts or CLI commands modified the palace directly, which can leave the in-memory HNSW index stale.",
+              "inputSchema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          ]
+        }
+      },
+      "tool_names": [
+        "mempalace_add_drawer",
+        "mempalace_check_duplicate",
+        "mempalace_create_tunnel",
+        "mempalace_delete_drawer",
+        "mempalace_delete_tunnel",
+        "mempalace_diary_read",
+        "mempalace_diary_write",
+        "mempalace_find_tunnels",
+        "mempalace_follow_tunnels",
+        "mempalace_get_aaak_spec",
+        "mempalace_get_drawer",
+        "mempalace_get_taxonomy",
+        "mempalace_graph_stats",
+        "mempalace_hook_settings",
+        "mempalace_kg_add",
+        "mempalace_kg_invalidate",
+        "mempalace_kg_query",
+        "mempalace_kg_stats",
+        "mempalace_kg_timeline",
+        "mempalace_list_drawers",
+        "mempalace_list_rooms",
+        "mempalace_list_tunnels",
+        "mempalace_list_wings",
+        "mempalace_memories_filed_away",
+        "mempalace_reconnect",
+        "mempalace_search",
+        "mempalace_status",
+        "mempalace_traverse",
+        "mempalace_update_drawer"
+      ],
+      "tool_count": 29,
+      "latency_ms": 0.5
+    },
+    "status": {
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\n  \"total_drawers\": 45,\n  \"wings\": {\n    \"meta_test\": 3,\n    \"shared_knowledge\": 12,\n    \"project_alpha\": 17,\n    \"project_beta\": 9,\n    \"unicode_test\": 4\n  },\n  \"rooms\": {\n    \"long_content\": 1,\n    \"types\": 2,\n    \"python\": 7,\n    \"architecture\": 8,\n    \"conventions\": 8,\n    \"debugging\": 7,\n    \"decisions\": 3,\n    \"docker\": 3,\n    \"git\": 2,\n    \"whitespace\": 1,\n    \"emoji\": 1,\n    \"japanese\": 1,\n    \"math_symbols\": 1\n  },\n  \"palace_path\": \"/tmp/rich-migration-test-20996/reconstructed-1x\",\n  \"protocol\": \"IMPORTANT \\u2014 MemPalace Memory Protocol:\\n1. ON WAKE-UP: Call mempalace_status to load palace overview + AAAK spec.\\n2. BEFORE RESPONDING about any person, project, or past event: call mempalace_kg_query or mempalace_search FIRST. Never guess \\u2014 verify.\\n3. IF UNSURE about a fact (name, gender, age, relationship): say \\\"let me check\\\" and query the palace. Wrong is worse than slow.\\n4. AFTER EACH SESSION: call mempalace_diary_write to record what happened, what you learned, what matters.\\n5. WHEN FACTS CHANGE: call mempalace_kg_invalidate on the old fact, mempalace_kg_add for the new one.\\n\\nThis protocol ensures the AI KNOWS before it speaks. Storage is not memory \\u2014 but storage + this protocol = memory.\",\n  \"aaak_dialect\": \"AAAK is a compressed memory dialect that MemPalace uses for efficient storage.\\nIt is designed to be readable by both humans and LLMs without decoding.\\n\\nFORMAT:\\n  ENTITIES: 3-letter uppercase codes. ALC=Alice, JOR=Jordan, RIL=Riley, MAX=Max, BEN=Ben.\\n  EMOTIONS: *action markers* before/during text. *warm*=joy, *fierce*=determined, *raw*=vulnerable, *bloom*=tenderness.\\n  STRUCTURE: Pipe-separated fields. FAM: family | PROJ: projects | \\u26a0: warnings/reminders.\\n  DATES: ISO format (2026-03-31). COUNTS: Nx = N mentions (e.g., 570x).\\n  IMPORTANCE: \\u2605 to \\u2605\\u2605\\u2605\\u2605\\u2605 (1-5 scale).\\n  HALLS: hall_facts, hall_events, hall_discoveries, hall_preferences, hall_advice.\\n  WINGS: wing_user, wing_agent, wing_team, wing_code, wing_myproject, wing_hardware, wing_ue5, wing_ai_research.\\n  ROOMS: Hyphenated slugs representing named ideas (e.g., chromadb-setup, gpu-pricing).\\n\\nEXAMPLE:\\n  FAM: ALC\\u2192\\u2661JOR | 2D(kids): RIL(18,sports) MAX(11,chess+swimming) | BEN(contributor)\\n\\nRead AAAK naturally \\u2014 expand codes mentally, treat *markers* as emotional context.\\nWhen WRITING AAAK: use entity codes, mark emotions, keep structure tight.\"\n}"
+            }
+          ]
+        }
+      },
+      "latency_ms": 130.8
+    },
+    "list_wings": {
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\n  \"wings\": {\n    \"meta_test\": 3,\n    \"shared_knowledge\": 12,\n    \"project_alpha\": 17,\n    \"project_beta\": 9,\n    \"unicode_test\": 4\n  }\n}"
+            }
+          ]
+        }
+      },
+      "latency_ms": 7.3
+    },
+    "list_rooms": {
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\n  \"wing\": \"project_alpha\",\n  \"rooms\": {\n    \"architecture\": 5,\n    \"conventions\": 5,\n    \"debugging\": 4,\n    \"decisions\": 3\n  }\n}"
+            }
+          ]
+        }
+      },
+      "latency_ms": 4.0
+    },
+    "taxonomy": {
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\n  \"taxonomy\": {\n    \"meta_test\": {\n      \"long_content\": 1,\n      \"types\": 2\n    },\n    \"shared_knowledge\": {\n      \"python\": 7,\n      \"docker\": 3,\n      \"git\": 2\n    },\n    \"project_alpha\": {\n      \"architecture\": 5,\n      \"conventions\": 5,\n      \"debugging\": 4,\n      \"decisions\": 3\n    },\n    \"project_beta\": {\n      \"architecture\": 3,\n      \"conventions\": 3,\n      \"debugging\": 3\n    },\n    \"unicode_test\": {\n      \"whitespace\": 1,\n      \"emoji\": 1,\n      \"japanese\": 1,\n      \"math_symbols\": 1\n    }\n  }\n}"
+            }
+          ]
+        }
+      },
+      "latency_ms": 0.3
+    },
+    "list_drawers": {
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\n  \"drawers\": [\n    {\n      \"drawer_id\": \"meta-long-001\",\n      \"wing\": \"meta_test\",\n      \"room\": \"long_content\",\n      \"content_preview\": \"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...\"\n    },\n    {\n      \"drawer_id\": \"meta-types-001\",\n      \"wing\": \"meta_test\",\n      \"room\": \"types\",\n      \"content_preview\": \"Testing metadata with integer values for priority and timestamp-like fields.\"\n    },\n    {\n      \"drawer_id\": \"meta-types-002\",\n      \"wing\": \"meta_test\",\n      \"room\": \"types\",\n      \"content_preview\": \"Testing metadata with boolean-like string values and empty strings.\"\n    },\n    {\n      \"drawer_id\": \"neardupe-a\",\n      \"wing\": \"shared_knowledge\",\n      \"room\": \"python\",\n      \"content_preview\": \"Always use virtual environments for Python projects. Never install packages globally. Use uv for dependency management.\"\n    },\n    {\n      \"drawer_id\": \"neardupe-b\",\n      \"wing\": \"shared_knowledge\",\n      \"room\": \"python\",\n      \"content_preview\": \"Always use virtual environments for Python projects. Never install packages globally. Use uv for dependency management. Updated: also pin Python version in .python-version.\"\n    }\n  ],\n  \"count\": 5,\n  \"offset\": 0,\n  \"limit\": 5\n}"
+            }
+          ]
+        }
+      },
+      "latency_ms": 1.6
+    },
+    "search_1": {
+      "query": "database connection pooling",
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 8,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\n  \"query\": \"database connection pooling\",\n  \"filters\": {\n    \"wing\": null,\n    \"room\": null\n  },\n  \"total_before_filter\": 15,\n  \"results\": [\n    {\n      \"text\": \"Database connections pool through PgBouncer in transaction mode. Max pool size is 50 per service, configured via environment variables. Connection strings must never be logged.\",\n      \"wing\": \"project_alpha\",\n      \"room\": \"architecture\",\n      \"source_file\": \"?\",\n      \"similarity\": 0.643,\n      \"distance\": 0.3571,\n      \"effective_distance\": 0.3571,\n      \"closet_boost\": 0.0,\n      \"matched_via\": \"drawer\",\n      \"bm25_score\": 1.699\n    },\n    {\n      \"text\": \"Context managers (with statements) must be used for all file I/O, database connections, and lock acquisition. Never rely on garbage collection for resource cleanup.\",\n      \"wing\": \"shared_knowledge\",\n      \"room\": \"python\",\n      \"source_file\": \"?\",\n      \"similarity\": 0.379,\n      \"distance\": 0.6208,\n      \"effective_distance\": 0.6208,\n      \"closet_boost\": 0.0,\n      \"matched_via\": \"drawer\",\n      \"bm25_score\": 0.882\n    },\n    {\n      \"text\": \"The 'connection reset by peer' error from PgBouncer usually means the server_idle_timeout was hit. Increase it or add connection validation on checkout.\",\n      \"wing\": \"project_alpha\",\n      \"room\": \"debugging\",\n      \"source_file\": \"?\",\n      \"similarity\": 0.211,\n      \"distance\": 0.7894,\n      \"effective_distance\": 0.7894,\n      \"closet_boost\": 0.0,\n      \"matched_via\": \"drawer\",\n      \"bm25_score\": 1.275\n    },\n    {\n      \"text\": \"ADR-001: Chose PostgreSQL over DynamoDB for the primary datastore. Rationale: complex queries, ACID transactions, and the team's existing expertise. Trade-off: operational overhead for scaling.\",\n      \"wing\": \"project_alpha\",\n      \"room\": \"decisions\",\n      \"source_file\": \"?\",\n      \"similarity\": 0.298,\n      \"distance\": 0.7017,\n      \"effective_distance\": 0.7017,\n      \"closet_boost\": 0.0,\n      \"matched_via\": \"drawer\",\n      \"bm25_score\": 0.0\n    },\n    {\n      \"text\": \"DDS discovery failures across subnets require explicit participant configuration. Set CYCLONEDDS_URI to point to a config file with the correct peer addresses.\",\n      \"wing\": \"project_beta\",\n      \"room\": \"debugging\",\n      \"source_file\": \"?\",\n      \"similarity\": 0.195,\n      \"distance\": 0.8053,\n      \"effective_distance\": 0.8053,\n      \"closet_boost\": 0.0,\n      \"matched_via\": \"drawer\",\n      \"bm25_score\": 0.0\n    }\n  ]\n}"
+            }
+          ]
+        }
+      },
+      "latency_ms": 221.1
+    },
+    "search_2": {
+      "query": "ROS 2 navigation behavior tree",
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 9,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\n  \"query\": \"ROS 2 navigation behavior tree\",\n  \"filters\": {\n    \"wing\": null,\n    \"room\": null\n  },\n  \"total_before_filter\": 15,\n  \"results\": [\n    {\n      \"text\": \"Navigation uses Nav2 with a custom BT (behavior tree) for warehouse operations. The BT includes recovery behaviors for stuck detection, path replanning, and emergency stop.\",\n      \"wing\": \"project_beta\",\n      \"room\": \"architecture\",\n      \"source_file\": \"?\",\n      \"similarity\": 0.631,\n      \"distance\": 0.3693,\n      \"effective_distance\": 0.3693,\n      \"closet_boost\": 0.0,\n      \"matched_via\": \"drawer\",\n      \"bm25_score\": 4.174\n    },\n    {\n      \"text\": \"ROS 2 package naming: <project>_<function> (e.g., beta_navigation, beta_perception). Node naming follows the same pattern with _node suffix.\",\n      \"wing\": \"project_beta\",\n      \"room\": \"conventions\",\n      \"source_file\": \"?\",\n      \"similarity\": 0.578,\n      \"distance\": 0.4222,\n      \"effective_distance\": 0.4222,\n      \"closet_boost\": 0.0,\n      \"matched_via\": \"drawer\",\n      \"bm25_score\": 1.033\n    },\n    {\n      \"text\": \"The robot control stack uses ROS 2 Jazzy with DDS (CycloneDDS) for inter-node communication. QoS profiles are tuned per topic: sensor data uses BEST_EFFORT, commands use RELIABLE.\",\n      \"wing\": \"project_beta\",\n      \"room\": \"architecture\",\n      \"source_file\": \"?\",\n      \"similarity\": 0.399,\n      \"distance\": 0.6005,\n      \"effective_distance\": 0.6005,\n      \"closet_boost\": 0.0,\n      \"matched_via\": \"drawer\",\n      \"bm25_score\": 0.832\n    },\n    {\n      \"text\": \"Branch naming: feature/<ticket-id>-<short-desc>, fix/<ticket-id>-<short-desc>, chore/<desc>. Main is protected; PRs require at least one approval and passing CI.\",\n      \"wing\": \"project_alpha\",\n      \"room\": \"conventions\",\n      \"source_file\": \"?\",\n      \"similarity\": 0.288,\n      \"distance\": 0.7117,\n      \"effective_distance\": 0.7117,\n      \"closet_boost\": 0.0,\n      \"matched_via\": \"drawer\",\n      \"bm25_score\": 0.0\n    },\n    {\n      \"text\": \"The event bus is built on NATS JetStream with at-least-once delivery. Consumer groups use durable subscriptions. Replay from a specific sequence number is supported for disaster recovery.\",\n      \"wing\": \"project_alpha\",\n      \"room\": \"architecture\",\n      \"source_file\": \"?\",\n      \"similarity\": 0.274,\n      \"distance\": 0.7264,\n      \"effective_distance\": 0.7264,\n      \"closet_boost\": 0.0,\n      \"matched_via\": \"drawer\",\n      \"bm25_score\": 0.0\n    }\n  ]\n}"
+            }
+          ]
+        }
+      },
+      "latency_ms": 144.4
+    },
+    "search_3": {
+      "query": "Docker multi-stage build",
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 10,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\n  \"query\": \"Docker multi-stage build\",\n  \"filters\": {\n    \"wing\": null,\n    \"room\": null\n  },\n  \"total_before_filter\": 15,\n  \"results\": [\n    {\n      \"text\": \"Multi-stage builds: use a builder stage for compilation/dependencies, then copy only artifacts to a slim runtime image. This reduces image size and attack surface.\",\n      \"wing\": \"shared_knowledge\",\n      \"room\": \"docker\",\n      \"source_file\": \"?\",\n      \"similarity\": 0.528,\n      \"distance\": 0.4715,\n      \"effective_distance\": 0.4715,\n      \"closet_boost\": 0.0,\n      \"matched_via\": \"drawer\",\n      \"bm25_score\": 3.377\n    },\n    {\n      \"text\": \"Always pin base image digests in production Dockerfiles. Tags like :latest or :3.12 can change unexpectedly. Use: FROM python:3.12.3-slim@sha256:abc...\",\n      \"wing\": \"shared_knowledge\",\n      \"room\": \"docker\",\n      \"source_file\": \"?\",\n      \"similarity\": 0.408,\n      \"distance\": 0.5916,\n      \"effective_distance\": 0.5916,\n      \"closet_boost\": 0.0,\n      \"matched_via\": \"drawer\",\n      \"bm25_score\": 0.0\n    },\n    {\n      \"text\": \"ADR-003: Adopted trunk-based development over GitFlow. Rationale: reduces merge conflicts, enables continuous delivery, and feature flags handle incomplete work.\",\n      \"wing\": \"project_alpha\",\n      \"room\": \"decisions\",\n      \"source_file\": \"?\",\n      \"similarity\": 0.346,\n      \"distance\": 0.6541,\n      \"effective_distance\": 0.6541,\n      \"closet_boost\": 0.0,\n      \"matched_via\": \"drawer\",\n      \"bm25_score\": 0.0\n    },\n    {\n      \"text\": \"The service mesh uses Envoy sidecars for inter-service TLS. Each pod gets a certificate rotated every 24 hours via SPIFFE. This was chosen over mTLS at the application layer because infrastructure-level encryption is transparent to developers.\",\n      \"wing\": \"project_alpha\",\n      \"room\": \"architecture\",\n      \"source_file\": \"?\",\n      \"similarity\": 0.215,\n      \"distance\": 0.7852,\n      \"effective_distance\": 0.7852,\n      \"closet_boost\": 0.0,\n      \"matched_via\": \"drawer\",\n      \"bm25_score\": 0.0\n    },\n    {\n      \"text\": \"Always use virtual environments for Python projects. Never install packages globally. Use uv for dependency management.\",\n      \"wing\": \"shared_knowledge\",\n      \"room\": \"python\",\n      \"source_file\": \"?\",\n      \"similarity\": 0.182,\n      \"distance\": 0.8181,\n      \"effective_distance\": 0.8181,\n      \"closet_boost\": 0.0,\n      \"matched_via\": \"drawer\",\n      \"bm25_score\": 0.0\n    }\n  ]\n}"
+            }
+          ]
+        }
+      },
+      "latency_ms": 155.2
+    },
+    "search_filtered": {
+      "query": "architecture decision (wing=project_alpha)",
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 11,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\n  \"query\": \"architecture decision\",\n  \"filters\": {\n    \"wing\": \"project_alpha\",\n    \"room\": null\n  },\n  \"total_before_filter\": 9,\n  \"results\": [\n    {\n      \"text\": \"ADR-003: Adopted trunk-based development over GitFlow. Rationale: reduces merge conflicts, enables continuous delivery, and feature flags handle incomplete work.\",\n      \"wing\": \"project_alpha\",\n      \"room\": \"decisions\",\n      \"source_file\": \"?\",\n      \"similarity\": 0.254,\n      \"distance\": 0.7461,\n      \"effective_distance\": 0.7461,\n      \"closet_boost\": 0.0,\n      \"matched_via\": \"drawer\",\n      \"bm25_score\": 0.0\n    },\n    {\n      \"text\": \"ADR-001: Chose PostgreSQL over DynamoDB for the primary datastore. Rationale: complex queries, ACID transactions, and the team's existing expertise. Trade-off: operational overhead for scaling.\",\n      \"wing\": \"project_alpha\",\n      \"room\": \"decisions\",\n      \"source_file\": \"?\",\n      \"similarity\": 0.174,\n      \"distance\": 0.826,\n      \"effective_distance\": 0.826,\n      \"closet_boost\": 0.0,\n      \"matched_via\": \"drawer\",\n      \"bm25_score\": 0.0\n    },\n    {\n      \"text\": \"Branch naming: feature/<ticket-id>-<short-desc>, fix/<ticket-id>-<short-desc>, chore/<desc>. Main is protected; PRs require at least one approval and passing CI.\",\n      \"wing\": \"project_alpha\",\n      \"room\": \"conventions\",\n      \"source_file\": \"?\",\n      \"similarity\": 0.158,\n      \"distance\": 0.8422,\n      \"effective_distance\": 0.8422,\n      \"closet_boost\": 0.0,\n      \"matched_via\": \"drawer\",\n      \"bm25_score\": 0.0\n    }\n  ]\n}"
+            }
+          ]
+        }
+      },
+      "latency_ms": 153.5
+    },
+    "check_duplicate": {
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 12,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\n  \"is_duplicate\": false,\n  \"matches\": []\n}"
+            }
+          ]
+        }
+      },
+      "latency_ms": 178.2
+    },
+    "get_drawer": {
+      "drawer_id": "meta-long-001",
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 13,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\n  \"drawer_id\": \"meta-long-001\",\n  \"content\": \"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA \\u2014 this drawer tests long document storage and retrieval fidelity.\",\n  \"wing\": \"meta_test\",\n  \"room\": \"long_content\",\n  \"metadata\": {\n    \"room\": \"long_content\",\n    \"char_count\": 5055,\n    \"wing\": \"meta_test\"\n  }\n}"
+            }
+          ]
+        }
+      },
+      "latency_ms": 2.4
+    },
+    "graph_stats": {
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 14,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\n  \"total_rooms\": 13,\n  \"tunnel_rooms\": 3,\n  \"total_edges\": 0,\n  \"rooms_per_wing\": {\n    \"project_alpha\": 4,\n    \"unicode_test\": 4,\n    \"shared_knowledge\": 3,\n    \"project_beta\": 3,\n    \"meta_test\": 2\n  },\n  \"top_tunnels\": [\n    {\n      \"room\": \"architecture\",\n      \"wings\": [\n        \"project_alpha\",\n        \"project_beta\"\n      ],\n      \"count\": 8\n    },\n    {\n      \"room\": \"conventions\",\n      \"wings\": [\n        \"project_alpha\",\n        \"project_beta\"\n      ],\n      \"count\": 8\n    },\n    {\n      \"room\": \"debugging\",\n      \"wings\": [\n        \"project_alpha\",\n        \"project_beta\"\n      ],\n      \"count\": 7\n    }\n  ]\n}"
+            }
+          ]
+        }
+      },
+      "latency_ms": 4.3
+    },
+    "kg_stats": {
+      "response": {
+        "jsonrpc": "2.0",
+        "id": 15,
+        "result": {
+          "content": [
+            {
+              "type": "text",
+              "text": "{\n  \"entities\": 88,\n  \"triples\": 59,\n  \"current_facts\": 59,\n  \"expired_facts\": 0,\n  \"relationship_types\": [\n    \"affected_by\",\n    \"auto-renders\",\n    \"bridges-via-to_config\",\n    \"closes_registration_on\",\n    \"composed_of\",\n    \"conflicts_with\",\n    \"consumes\",\n    \"contains\",\n    \"correct_replacement_for\",\n    \"declares_parameter\",\n    \"defined_in\",\n    \"dirty_repo_count\",\n    \"drives\",\n    \"enables\",\n    \"enforces\",\n    \"fixed_by\",\n    \"generates\",\n    \"had_bug\",\n    \"has_architecture_layers\",\n    \"has_core_principle\",\n    \"has_method\",\n    \"has_source_of_truth\",\n    \"hotspot_repo\",\n    \"inherits\",\n    \"injects_solver_via\",\n    \"is\",\n    \"kwarg_parameter_of\",\n    \"may_skip\",\n    \"must_match\",\n    \"now_imported_via_type_checking\",\n    \"orchestrates\",\n    \"receives_injected_services_from\",\n    \"replaces\",\n    \"repo_count\",\n    \"requires\",\n    \"requires_clone_override\",\n    \"resolved_circular_imports_in\",\n    \"rosparameter_of\",\n    \"shares_cleanup_pattern_with\",\n    \"uses\",\n    \"uses-enum\",\n    \"uses_contract\",\n    \"uses_pattern\",\n    \"validates_with\",\n    \"works_on\",\n    \"wraps\"\n  ]\n}"
+            }
+          ]
+        }
+      },
+      "latency_ms": 0.4
+    }
+  }
+}

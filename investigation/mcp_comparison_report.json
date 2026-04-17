@@ -1,0 +1,138 @@
+{
+  "summary": {
+    "total_phases": 15,
+    "identical": 9,
+    "identical_content": 0,
+    "different": 6,
+    "skipped": 0,
+    "errors": 0,
+    "divergence_count": 6
+  },
+  "phases": {
+    "check_duplicate": {
+      "phase": "check_duplicate",
+      "status": "IDENTICAL",
+      "native_ms": 184.4,
+      "recon_ms": 178.2
+    },
+    "get_drawer": {
+      "phase": "get_drawer",
+      "status": "DIFFERENT",
+      "native_ms": 1.6,
+      "recon_ms": 2.4,
+      "native_preview": "{\n  \"drawer_id\": \"project_alpha-architecture-0001\",\n  \"content\": \"The service mesh uses Envoy sidecars for inter-service TLS. Each pod gets a certificate rotated every 24 hours via SPIFFE. This was chosen over mTLS at the application layer because infrastructure-level encryption is transparent to developers.\",\n  \"wing\": \"project_alpha\",\n  \"room\": \"architecture\",\n  \"metadata\": {\n    \"wing\": \"project_alpha\",\n    \"room\": \"architecture\",\n    \"source\": \"rich_fixture\"\n  }\n}",
+      "recon_preview": "{\n  \"drawer_id\": \"meta-long-001\",\n  \"content\": \"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+    },
+    "graph_stats": {
+      "phase": "graph_stats",
+      "status": "DIFFERENT",
+      "native_ms": 3.7,
+      "recon_ms": 4.3,
+      "native_preview": "{\n  \"total_rooms\": 13,\n  \"tunnel_rooms\": 3,\n  \"total_edges\": 0,\n  \"rooms_per_wing\": {\n    \"project_alpha\": 4,\n    \"unicode_test\": 4,\n    \"project_beta\": 3,\n    \"shared_knowledge\": 3,\n    \"meta_test\": 2\n  },\n  \"top_tunnels\": [\n    {\n      \"room\": \"architecture\",\n      \"wings\": [\n        \"project_alpha\",\n        \"project_beta\"\n      ],\n      \"count\": 8\n    },\n    {\n      \"room\": \"conventions\",\n      \"wings\": [\n        \"project_alpha\",\n        \"project_beta\"\n      ],\n      \"count\": 8\n    },\n    {\n ",
+      "recon_preview": "{\n  \"total_rooms\": 13,\n  \"tunnel_rooms\": 3,\n  \"total_edges\": 0,\n  \"rooms_per_wing\": {\n    \"project_alpha\": 4,\n    \"unicode_test\": 4,\n    \"shared_knowledge\": 3,\n    \"project_beta\": 3,\n    \"meta_test\": 2\n  },\n  \"top_tunnels\": [\n    {\n      \"room\": \"architecture\",\n      \"wings\": [\n        \"project_alpha\",\n        \"project_beta\"\n      ],\n      \"count\": 8\n    },\n    {\n      \"room\": \"conventions\",\n      \"wings\": [\n        \"project_alpha\",\n        \"project_beta\"\n      ],\n      \"count\": 8\n    },\n    {\n "
+    },
+    "initialize": {
+      "phase": "initialize",
+      "status": "IDENTICAL",
+      "native_ms": 809.2,
+      "recon_ms": 814.0,
+      "native_protocol": "2024-11-05",
+      "recon_protocol": "2024-11-05",
+      "native_server": "mempalace",
+      "recon_server": "mempalace"
+    },
+    "kg_stats": {
+      "phase": "kg_stats",
+      "status": "IDENTICAL",
+      "native_ms": 0.5,
+      "recon_ms": 0.4
+    },
+    "list_drawers": {
+      "phase": "list_drawers",
+      "status": "DIFFERENT",
+      "native_ms": 1.9,
+      "recon_ms": 1.6,
+      "native_preview": "{\n  \"drawers\": [\n    {\n      \"drawer_id\": \"project_alpha-architecture-0001\",\n      \"wing\": \"project_alpha\",\n      \"room\": \"architecture\",\n      \"content_preview\": \"The service mesh uses Envoy sidecars for inter-service TLS. Each pod gets a certificate rotated every 24 hours via SPIFFE. This was chosen over mTLS at the application layer because infrastructure-lev...\"\n    },\n    {\n      \"drawer_id\": \"project_alpha-architecture-0002\",\n      \"wing\": \"project_alpha\",\n      \"room\": \"architecture\",\n   ",
+      "recon_preview": "{\n  \"drawers\": [\n    {\n      \"drawer_id\": \"meta-long-001\",\n      \"wing\": \"meta_test\",\n      \"room\": \"long_content\",\n      \"content_preview\": \"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA...\"\n    },\n    {\n      \"drawer_id\": \"meta-types-001\",\n      \"wing\": \"meta_test\",\n      \"room\": \"types\",\n      \"content_preview\": \"Testing metadata with integ"
+    },
+    "list_rooms": {
+      "phase": "list_rooms",
+      "status": "IDENTICAL",
+      "native_ms": 4.8,
+      "recon_ms": 4.0
+    },
+    "list_wings": {
+      "phase": "list_wings",
+      "status": "DIFFERENT",
+      "native_ms": 7.7,
+      "recon_ms": 7.3,
+      "native_preview": "{\n  \"wings\": {\n    \"project_alpha\": 17,\n    \"project_beta\": 9,\n    \"shared_knowledge\": 12,\n    \"unicode_test\": 4,\n    \"meta_test\": 3\n  }\n}",
+      "recon_preview": "{\n  \"wings\": {\n    \"meta_test\": 3,\n    \"shared_knowledge\": 12,\n    \"project_alpha\": 17,\n    \"project_beta\": 9,\n    \"unicode_test\": 4\n  }\n}"
+    },
+    "search_1": {
+      "phase": "search_1",
+      "status": "IDENTICAL",
+      "native_ms": 268.4,
+      "recon_ms": 221.1
+    },
+    "search_2": {
+      "phase": "search_2",
+      "status": "IDENTICAL",
+      "native_ms": 182.4,
+      "recon_ms": 144.4
+    },
+    "search_3": {
+      "phase": "search_3",
+      "status": "IDENTICAL",
+      "native_ms": 180.6,
+      "recon_ms": 155.2
+    },
+    "search_filtered": {
+      "phase": "search_filtered",
+      "status": "IDENTICAL",
+      "native_ms": 171.6,
+      "recon_ms": 153.5
+    },
+    "status": {
+      "phase": "status",
+      "status": "DIFFERENT",
+      "native_ms": 104.3,
+      "recon_ms": 130.8,
+      "native_preview": "{\n  \"total_drawers\": 45,\n  \"wings\": {\n    \"project_alpha\": 17,\n    \"project_beta\": 9,\n    \"shared_knowledge\": 12,\n    \"unicode_test\": 4,\n    \"meta_test\": 3\n  },\n  \"rooms\": {\n    \"architecture\": 8,\n    \"conventions\": 8,\n    \"debugging\": 7,\n    \"decisions\": 3,\n    \"python\": 7,\n    \"docker\": 3,\n    \"git\": 2,\n    \"japanese\": 1,\n    \"emoji\": 1,\n    \"math_symbols\": 1,\n    \"whitespace\": 1,\n    \"types\": 2,\n    \"long_content\": 1\n  },\n  \"palace_path\": \"/tmp/rich-migration-test-20996/native-1x\",\n  \"protoco",
+      "recon_preview": "{\n  \"total_drawers\": 45,\n  \"wings\": {\n    \"meta_test\": 3,\n    \"shared_knowledge\": 12,\n    \"project_alpha\": 17,\n    \"project_beta\": 9,\n    \"unicode_test\": 4\n  },\n  \"rooms\": {\n    \"long_content\": 1,\n    \"types\": 2,\n    \"python\": 7,\n    \"architecture\": 8,\n    \"conventions\": 8,\n    \"debugging\": 7,\n    \"decisions\": 3,\n    \"docker\": 3,\n    \"git\": 2,\n    \"whitespace\": 1,\n    \"emoji\": 1,\n    \"japanese\": 1,\n    \"math_symbols\": 1\n  },\n  \"palace_path\": \"/tmp/rich-migration-test-20996/reconstructed-1x\",\n  \""
+    },
+    "taxonomy": {
+      "phase": "taxonomy",
+      "status": "DIFFERENT",
+      "native_ms": 0.4,
+      "recon_ms": 0.3,
+      "native_preview": "{\n  \"taxonomy\": {\n    \"project_alpha\": {\n      \"architecture\": 5,\n      \"conventions\": 5,\n      \"debugging\": 4,\n      \"decisions\": 3\n    },\n    \"project_beta\": {\n      \"architecture\": 3,\n      \"conventions\": 3,\n      \"debugging\": 3\n    },\n    \"shared_knowledge\": {\n      \"python\": 7,\n      \"docker\": 3,\n      \"git\": 2\n    },\n    \"unicode_test\": {\n      \"japanese\": 1,\n      \"emoji\": 1,\n      \"math_symbols\": 1,\n      \"whitespace\": 1\n    },\n    \"meta_test\": {\n      \"types\": 2,\n      \"long_content\": 1",
+      "recon_preview": "{\n  \"taxonomy\": {\n    \"meta_test\": {\n      \"long_content\": 1,\n      \"types\": 2\n    },\n    \"shared_knowledge\": {\n      \"python\": 7,\n      \"docker\": 3,\n      \"git\": 2\n    },\n    \"project_alpha\": {\n      \"architecture\": 5,\n      \"conventions\": 5,\n      \"debugging\": 4,\n      \"decisions\": 3\n    },\n    \"project_beta\": {\n      \"architecture\": 3,\n      \"conventions\": 3,\n      \"debugging\": 3\n    },\n    \"unicode_test\": {\n      \"whitespace\": 1,\n      \"emoji\": 1,\n      \"japanese\": 1,\n      \"math_symbols\": 1"
+    },
+    "tools_list": {
+      "phase": "tools_list",
+      "status": "IDENTICAL",
+      "native_ms": 0.5,
+      "recon_ms": 0.5,
+      "native_tool_count": 29,
+      "recon_tool_count": 29
+    }
+  },
+  "divergences": [
+    "get_drawer: content differs",
+    "graph_stats: content differs",
+    "list_drawers: content differs",
+    "list_wings: content differs",
+    "status: content differs",
+    "taxonomy: content differs"
+  ],
+  "verdict": "DIFFERENT",
+  "native_palace": "/tmp/rich-migration-test-20996/native-1x",
+  "reconstructed_palace": "/tmp/rich-migration-test-20996/reconstructed-1x",
+  "native_python": "/home/adrienpagon/git/mempalace-mcp-bridge/.venv-chromadb1/bin/python",
+  "reconstructed_python": "/home/adrienpagon/git/mempalace-mcp-bridge/.venv-chromadb1/bin/python",
+  "native_total_ms": 2022.7,
+  "reconstructed_total_ms": 1918.7,
+  "native_exit": 0,
+  "reconstructed_exit": 0
+}
