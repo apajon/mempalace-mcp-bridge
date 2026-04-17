@@ -372,6 +372,7 @@ fi
 PALACE_PATH=""
 MANIFEST_PATH=""
 PALACE_INFO_READY=false
+PALACE_SAFE=true
 
 if [ -f "$VENV_PYTHON" ] && [ -n "$MEMPALACE_VERSION" ]; then
     PALACE_FACTS="$("$VENV_PYTHON" - <<'PYEOF' 2>/dev/null || true
@@ -398,10 +399,50 @@ PYEOF
         PALACE_INFO_READY=true
     fi
 
-    HEALTH_EXIT=0
-    HEALTH_OUTPUT=$(bash "$REPO_ROOT/scripts/check_palace_health.sh" --read-only 2>&1) || HEALTH_EXIT=$?
+    if [ "$PALACE_INFO_READY" = true ] && [ -f "$PALACE_PATH/chroma.sqlite3" ]; then
+        PALACE_SAFETY_RESULT="$("$VENV_PYTHON" - <<PYEOF 2>/dev/null || true
+import sys
+from pathlib import Path
 
-    if [ "$HEALTH_EXIT" -eq 0 ]; then
+sys.path.insert(0, str(Path(r"$REPO_ROOT") / "scripts"))
+
+from palace_safety_gate import evaluate_palace_safety  # type: ignore
+
+result = evaluate_palace_safety(Path(r"$PALACE_PATH"), "read")
+print(f"allowed\t{1 if result.allowed else 0}")
+print(f"classification\t{result.classification}")
+print(f"message\t{result.message}")
+PYEOF
+)"
+        PALACE_SAFETY_ALLOWED=""
+        PALACE_SAFETY_CLASS=""
+        PALACE_SAFETY_MESSAGE=""
+        while IFS=$'\t' read -r key value; do
+            case "$key" in
+                allowed) PALACE_SAFETY_ALLOWED="$value" ;;
+                classification) PALACE_SAFETY_CLASS="$value" ;;
+                message) PALACE_SAFETY_MESSAGE="$value" ;;
+            esac
+        done <<< "$PALACE_SAFETY_RESULT"
+
+        if [ "$PALACE_SAFETY_ALLOWED" = "1" ]; then
+            pass "Palace format is safe for the stable path ($PALACE_SAFETY_CLASS)"
+        else
+            PALACE_SAFE=false
+            fail "Palace format is unsafe for the stable path ($PALACE_SAFETY_CLASS)"
+            detail "$PALACE_SAFETY_MESSAGE"
+            detail "Palace health and manifest trust checks were skipped to avoid opening it with the wrong stack."
+        fi
+    fi
+
+    HEALTH_EXIT=0
+    if [ "$PALACE_SAFE" = true ]; then
+        HEALTH_OUTPUT=$(bash "$REPO_ROOT/scripts/check_palace_health.sh" --read-only 2>&1) || HEALTH_EXIT=$?
+    fi
+
+    if [ "$PALACE_SAFE" != true ]; then
+        :
+    elif [ "$HEALTH_EXIT" -eq 0 ]; then
         DRAWER_COUNT=$(echo "$HEALTH_OUTPUT" | grep -oE '[0-9]+ drawers' | grep -oE '[0-9]+' || true)
         pass "Palace is readable${DRAWER_COUNT:+ ($DRAWER_COUNT drawers)}"
     elif [ "$HEALTH_EXIT" -eq 2 ]; then
@@ -417,7 +458,7 @@ fi
 
 # ─── 11. Palace manifest integrity and drift ────────────────────────────────────
 
-if [ "$PALACE_INFO_READY" = true ]; then
+if [ "$PALACE_INFO_READY" = true ] && [ "$PALACE_SAFE" = true ]; then
     MANIFEST_RESULT="$("$VENV_PYTHON" - <<PYEOF 2>/dev/null || true
 import importlib.metadata
 import json

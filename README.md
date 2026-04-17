@@ -20,6 +20,7 @@ This repo provides a plug-and-play bridge:
 - Mine your own files — query your notes, docs, and decisions
 - Built-in verification — `verify.sh` classifies the bridge as healthy, suspicious, or unsafe by checking the environment, the generated MCP config, real MCP startup, and palace manifest drift
 - Palace safety checks — setup, update, verify, and runtime startup reject unsupported `chromadb` versions and keep the bridge on the tested `0.6.x` line
+- Palace format safety gate — risky stable-path operations refuse palaces detected as `chroma_1_x` or `unknown`
 - Palace manifest — setup writes `mempalace-bridge-manifest.json` into the palace root for version traceability
 - Reusable across environments with a shared palace
 
@@ -197,6 +198,7 @@ If you want to go deeper:
 |-------|------|
 | Architecture overview | [docs/architecture.md](docs/architecture.md) |
 | MCP config and VS Code integration | [docs/mcp_vscode.md](docs/mcp_vscode.md) |
+| Palace format detection | [docs/palace_format_detection.md](docs/palace_format_detection.md) |
 | Devcontainer integration | [docs/devcontainer_integration.md](docs/devcontainer_integration.md) |
 | Update and verify workflow | [docs/update_workflow.md](docs/update_workflow.md) |
 | Troubleshooting | [docs/troubleshooting.md](docs/troubleshooting.md) |

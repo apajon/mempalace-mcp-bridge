@@ -29,6 +29,11 @@ info "Initializing MemPalace..."
 
 # MemPalace init detects rooms from the project folder structure.
 # Palace storage defaults to ~/.mempalace/palace (or path set via --palace).
+if ! "$VENV_PYTHON" "$REPO_ROOT/scripts/palace_safety_gate.py" --action create >/dev/null; then
+    "$VENV_PYTHON" "$REPO_ROOT/scripts/palace_safety_gate.py" --action create
+    exit 1
+fi
+
 cd "$REPO_ROOT"
 uv run --python "$VENV_PYTHON" mempalace init "$REPO_ROOT"
 "$VENV_PYTHON" "$MANIFEST_SCRIPT"

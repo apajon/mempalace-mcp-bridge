@@ -31,6 +31,11 @@ fi
 
 info "Mining files from $REPO_ROOT ..."
 
+if ! "$VENV_PYTHON" "$REPO_ROOT/scripts/palace_safety_gate.py" --action write >/dev/null; then
+    "$VENV_PYTHON" "$REPO_ROOT/scripts/palace_safety_gate.py" --action write
+    exit 1
+fi
+
 cd "$REPO_ROOT"
 uv run --python "$VENV_PYTHON" mempalace mine "$REPO_ROOT"
 
