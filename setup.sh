@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # setup.sh
 # One-command setup: installs MemPalace, initializes the palace,
-# mines sample data, and writes .vscode/mcp.json with the correct uv path.
+# mines sample data, and writes .mcp.json with the correct uv path.
 # Safe to re-run (idempotent).
 
 set -euo pipefail
@@ -44,9 +44,9 @@ fi
 info "Step 3/4 — Mining sample notes..."
 bash "$REPO_ROOT/scripts/mine_sample_data.sh"
 
-# ─── 4. Generate .vscode/mcp.json ─────────────────────────────────────────────
+# ─── 4. Generate .mcp.json ───────────────────────────────────────────────────
 
-info "Step 4/4 — Generating VS Code MCP config..."
+info "Step 4/4 — Generating workspace MCP config..."
 
 UV_PATH="$(command -v uv 2>/dev/null || true)"
 if [ -z "$UV_PATH" ]; then
@@ -60,10 +60,7 @@ if [ -z "$UV_PATH" ]; then
 fi
 [ -n "$UV_PATH" ] || fail "uv not found after bootstrap — cannot write MCP config."
 
-VSCODE_DIR="$REPO_ROOT/.vscode"
-MCP_CONFIG="$VSCODE_DIR/mcp.json"
-
-mkdir -p "$VSCODE_DIR"
+MCP_CONFIG="$REPO_ROOT/.mcp.json"
 
 # Only regenerate if the config is missing, has placeholder paths, or the
 # stored paths no longer match this machine (e.g. repo moved, uv reinstalled).
@@ -76,7 +73,7 @@ import json
 try:
     with open('$MCP_CONFIG') as f:
         cfg = json.load(f)
-    args = cfg['servers']['mempalace'].get('args', [])
+    args = cfg['mcpServers']['mempalace'].get('args', [])
     idx = args.index('--directory') if '--directory' in args else -1
     print(args[idx + 1] if idx >= 0 else '')
 except Exception:
@@ -87,7 +84,7 @@ import json
 try:
     with open('$MCP_CONFIG') as f:
         cfg = json.load(f)
-    print(cfg['servers']['mempalace'].get('command', ''))
+    print(cfg['mcpServers']['mempalace'].get('command', ''))
 except Exception:
     print('')
 " 2>/dev/null || true)
@@ -96,7 +93,7 @@ import json
 try:
     with open('$MCP_CONFIG') as f:
         cfg = json.load(f)
-    print(json.dumps(cfg['servers']['mempalace'].get('args', [])))
+    print(json.dumps(cfg['mcpServers']['mempalace'].get('args', [])))
 except Exception:
     print('')
 " 2>/dev/null || true)
@@ -109,7 +106,7 @@ fi
 if [ "$_needs_regen" = true ]; then
     cat > "$MCP_CONFIG" <<EOF
 {
-  "servers": {
+  "mcpServers": {
     "mempalace": {
       "type": "stdio",
       "command": "$UV_PATH",

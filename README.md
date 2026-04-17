@@ -5,7 +5,7 @@ Give [MemPalace](https://github.com/milla-jovovich/mempalace) a persistent local
 This repo provides a plug-and-play bridge:
 
 - one-command setup
-- generated VS Code MCP config
+- generated workspace MCP config
 - automatic MCP server startup through VS Code
 - full-stack verification with `verify.sh`
 - a stable ChromaDB `0.6.x` line for existing palaces
@@ -56,7 +56,7 @@ This repo is for you if:
 git clone https://github.com/apajon/mempalace-mcp-bridge.git
 cd mempalace-mcp-bridge
 
-# 2. Setup everything (installs uv, MemPalace, mines sample data, writes VS Code config)
+# 2. Setup everything (installs uv, MemPalace, mines sample data, writes .mcp.json)
 bash setup.sh
 
 # 3. Open this folder in VS Code
@@ -72,7 +72,7 @@ Optionally verify the generated setup before opening Copilot Chat:
 bash verify.sh
 ```
 
-`verify.sh` is intentionally narrow. It checks the pinned Python/Chroma environment, the installed MemPalace version, `.vscode/mcp.json` integrity, real MCP startup, palace readability, and whether the palace manifest still matches the active environment. The summary is one of:
+`verify.sh` is intentionally narrow. It checks the pinned Python/Chroma environment, the installed MemPalace version, `.mcp.json` integrity, real MCP startup, palace readability, and whether the palace manifest still matches the active environment. The summary is one of:
 
 - **SUPPORTED and healthy** — all checks passed
 - **SUPPORTED but suspicious** — the bridge still works, but drift was detected and should be reviewed
@@ -140,7 +140,7 @@ This repo removes that friction. Setup takes about 2 minutes.
 VsCode Copilot Chat
      │
      ▼
-MCP Server  ← launched automatically by VS Code via .vscode/mcp.json
+MCP Server  ← launched automatically by Copilot via .mcp.json
      │
      ▼
 MemPalace
@@ -149,7 +149,13 @@ MemPalace
 Local Memory (palace)  ← ~/.mempalace/palace
 ```
 
-`setup.sh` generates `.vscode/mcp.json` with the absolute path to your `uv` binary, so VS Code can start the server without any manual configuration.
+`setup.sh` generates `.mcp.json` with the absolute path to your `uv` binary, so Copilot can start the server without any manual configuration.
+
+If you already have a legacy `.vscode/mcp.json`, migrate it with:
+
+```bash
+jq '{mcpServers: .servers}' .vscode/mcp.json > .mcp.json
+```
 
 The same setup step writes `mempalace-bridge-manifest.json` into the palace root. The file is intentionally small and easy to inspect manually: it records the bridge version, MemPalace version, ChromaDB version, Python version, storage backend and format, the supported compatibility line, and the creation timestamp. If a valid manifest already exists, setup preserves it. If the file exists but is malformed, setup replaces it with a fresh valid manifest.
 
