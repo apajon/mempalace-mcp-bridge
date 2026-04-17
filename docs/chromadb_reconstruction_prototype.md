@@ -429,6 +429,151 @@ export path:
 
 ## Commands
 
+### Preferred single entrypoint
+
+For advanced users, the full reconstruction workflow can now be run through a single,
+reproducible wrapper script.
+
+Minimal structure + retrieval flow:
+
+```bash
+./scripts/reconstruct.sh \
+  --source-palace ~/.mempalace/palace \
+  --target-palace /tmp/palace-target \
+  --work-dir /tmp/palace-reconstruction-run \
+  --source-python .venv/bin/python \
+  --target-python .venv-chromadb1/bin/python
+```
+
+Full experimental flow including usage and MCP runtime validation:
+
+```bash
+./scripts/reconstruct.sh \
+  --source-palace ~/.mempalace/palace \
+  --target-palace /tmp/palace-target \
+  --work-dir /tmp/palace-reconstruction-run \
+  --source-python .venv/bin/python \
+  --target-python .venv-chromadb1/bin/python \
+  --with-usage \
+  --with-mcp-runtime
+```
+
+Dry-run the exact pipeline without creating anything:
+
+```bash
+./scripts/reconstruct.sh \
+  --source-palace ~/.mempalace/palace \
+  --target-palace /tmp/palace-target \
+  --work-dir /tmp/palace-reconstruction-run \
+  --source-python .venv/bin/python \
+  --target-python .venv-chromadb1/bin/python \
+  --with-usage \
+  --with-mcp-runtime \
+  --dry-run
+```
+
+The wrapper:
+
+- logs every step with the exact command being executed
+- stops at the first failing phase
+- keeps export and validation artifacts under the selected work dir
+- leaves the source palace untouched
+
+Artifacts written under the work dir:
+
+- `export-bundle/`
+- `source-retrieval-results.json`
+- `target-retrieval-results.json`
+- `source-usage-results.json` and `target-usage-results.json` when `--with-usage` is enabled
+
+Sample output:
+
+```text
+════════════════════════════════════════
+ MemPalace Reconstruction Pipeline
+════════════════════════════════════════
+
+[INFO]  Step 1/6 — Export source palace to a neutral bundle (0.6.x runtime)
+[INFO]  Command: .venv/bin/python scripts/palace_reconstruction_prototype.py export --source-palace ~/.mempalace/palace --output-dir /tmp/palace-reconstruction-run/export-bundle
+[OK]    Exported 842 drawers to /tmp/palace-reconstruction-run/export-bundle
+[OK]    Completed step 1/6
+
+[INFO]  Step 2/6 — Import bundle into the target palace (target runtime)
+[OK]    Imported 842 drawers into /tmp/palace-target
+[OK]    Completed step 2/6
+
+[INFO]  Step 3/6 — Validate structural reconstruction
+[OK]    Reconstruction validation passed
+[OK]    Completed step 3/6
+
+[INFO]  Step 6/6 — Compare retrieval results
+[OK]    Retrieval validation passed
+[OK]    Completed step 6/6
+```
+
+Representative failure case:
+
+```text
+[INFO]  Step 1/6 — Export source palace to a neutral bundle (0.6.x runtime)
+[ERROR] Export failed: source palace failed integrity checks before bundle generation
+[INFO]  Category: data integrity
+[INFO]  Details:
+[INFO]    - duplicate source ids: drawer_a
+[INFO]  Where to look:
+[INFO]    - /home/me/.mempalace/palace/chroma.sqlite3
+[INFO]  Suggested action: Inspect the referenced sqlite rows or drawer ids, repair the source data, and rerun export without modifying the original palace in place.
+[ERROR] Step 1/6 failed: Export source palace to a neutral bundle (0.6.x runtime)
+```
+
+This failure is intentional: the pipeline stops before import so the target is never partially
+rebuilt from a structurally invalid source.
+
+### Before / after failure output
+
+Before, many failures looked like a single flat error:
+
+```text
+[ERROR] Refusing export: source integrity checks failed: duplicate source ids: drawer_a
+```
+
+Now the output is grouped and actionable:
+
+```text
+[ERROR] Export failed: source palace failed integrity checks before bundle generation
+[INFO]  Category: data integrity
+[INFO]  Details:
+[INFO]    - duplicate source ids: drawer_a
+[INFO]  Where to look:
+[INFO]    - /home/me/.mempalace/palace/chroma.sqlite3
+[INFO]  Suggested action: Inspect the referenced sqlite rows or drawer ids, repair the source data, and rerun export without modifying the original palace in place.
+```
+
+Comparison failures now also emit grouped summaries plus a debug artifact file, for example:
+
+```text
+[ERROR] Retrieval validation failed
+[INFO]  Retrieval failure summary:
+[INFO]    Retrieval mismatch:
+[INFO]      - query-001 anchor=drawer_alpha source=3 target=3 overlap=0 issues=target did not retrieve anchor id, source overlap ratio 0.0 is below threshold 0.4
+[INFO]      Where to look: /tmp/source-retrieval.json
+[INFO]      Suggested action: Review the listed query ids and anchor drawers in the retrieval result artifacts to see whether the target missed the expected semantic neighborhood.
+[INFO]  Debug artifact: /tmp/reconstruction-retrieval-debug.json
+```
+
+### Debugging guidelines
+
+1. **Structural** failures mean the pipeline shape is broken: wrong source format, missing files, non-empty target, plan mismatch, target manifest mismatch, or MCP startup/tool issues.
+2. **Data integrity** failures mean the exported or imported drawer set is inconsistent: duplicate ids, missing drawers, unexpected drawers, content hash drift, metadata drift, or missing embeddings.
+3. **Retrieval mismatch** failures mean the runtime still loads, but semantic behavior diverges: missing anchor retrieval, empty result sets, low overlap, or degraded scenario behavior.
+4. When a validation or comparison step fails, inspect the emitted debug artifact first:
+   - `export-bundle/reconstruction-validation-debug.json`
+   - `reconstruction-retrieval-debug.json`
+   - `reconstruction-usage-debug.json`
+   - `export-bundle/reconstruction-mcp-runtime-debug.json`
+5. The wrapper script also points back to the selected `--work-dir`, so start there before re-running with ad-hoc commands.
+
+### Manual subcommands
+
 ### 1. Export from a stable source
 
 Run this under the source-safe environment:

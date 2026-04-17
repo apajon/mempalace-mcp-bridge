@@ -58,6 +58,35 @@ USAGE_UNUSABLE = "unusable"
 MCP_PROTOCOL_VERSION = "2025-11-25"
 MCP_REQUEST_TIMEOUT_SECONDS = 10.0
 MCP_STARTUP_GRACE_SECONDS = 1.0
+VALIDATION_DEBUG_FILENAME = "reconstruction-validation-debug.json"
+RETRIEVAL_DEBUG_FILENAME = "reconstruction-retrieval-debug.json"
+USAGE_DEBUG_FILENAME = "reconstruction-usage-debug.json"
+MCP_RUNTIME_DEBUG_FILENAME = "reconstruction-mcp-runtime-debug.json"
+
+
+class ReconstructionCliError(RuntimeError):
+    def __init__(
+        self,
+        *,
+        stage: str,
+        category: str,
+        summary: str,
+        details: list[str] | None = None,
+        suggested_action: str | None = None,
+        where_to_look: list[str] | None = None,
+    ) -> None:
+        super().__init__(summary)
+        self.stage = stage
+        self.category = category
+        self.summary = summary
+        self.details = details or []
+        self.suggested_action = suggested_action
+        self.where_to_look = where_to_look or []
+
+    def __str__(self) -> str:
+        if not self.details:
+            return self.summary
+        return f"{self.summary}: {'; '.join(self.details)}"
 
 
 def _iso_timestamp_now() -> str:
@@ -117,6 +146,71 @@ def _preview_items(values: list[Any], *, limit: int = DIAGNOSTIC_PREVIEW_COUNT) 
     if remaining > 0:
         return f"{preview}, ... (+{remaining} more)"
     return preview
+
+
+def _raise_cli_error(
+    *,
+    stage: str,
+    category: str,
+    summary: str,
+    details: list[str] | None = None,
+    suggested_action: str | None = None,
+    where_to_look: list[str] | None = None,
+) -> None:
+    raise ReconstructionCliError(
+        stage=stage,
+        category=category,
+        summary=summary,
+        details=details,
+        suggested_action=suggested_action,
+        where_to_look=where_to_look,
+    )
+
+
+def _print_cli_error(exc: ReconstructionCliError) -> None:
+    print(f"[ERROR] {exc.stage.capitalize()} failed: {exc.summary}", file=sys.stderr)
+    print(f"[INFO]  Category: {exc.category}", file=sys.stderr)
+    if exc.details:
+        print("[INFO]  Details:", file=sys.stderr)
+        for detail in exc.details:
+            print(f"[INFO]    - {detail}", file=sys.stderr)
+    if exc.where_to_look:
+        print("[INFO]  Where to look:", file=sys.stderr)
+        for location in exc.where_to_look:
+            print(f"[INFO]    - {location}", file=sys.stderr)
+    if exc.suggested_action:
+        print(f"[INFO]  Suggested action: {exc.suggested_action}", file=sys.stderr)
+
+
+def _write_debug_artifact(path: Path, payload: dict[str, Any]) -> str | None:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w", encoding="utf-8") as handle:
+            json.dump(payload, handle, indent=2)
+            handle.write("\n")
+        return str(path)
+    except OSError as exc:
+        print(f"[WARN]  Could not write debug artifact {path}: {exc}", file=sys.stderr)
+        return None
+
+
+def _print_error_groups(
+    title: str,
+    error_groups: list[dict[str, Any]],
+    *,
+    debug_artifact_path: str | None = None,
+) -> None:
+    print(f"[INFO]  {title}:", file=sys.stderr)
+    for group in error_groups:
+        print(f"[INFO]    {group['category'].capitalize()}:", file=sys.stderr)
+        for item in group.get("items", []):
+            print(f"[INFO]      - {item}", file=sys.stderr)
+        for location in group.get("where_to_look", []):
+            print(f"[INFO]      Where to look: {location}", file=sys.stderr)
+        if group.get("suggested_action"):
+            print(f"[INFO]      Suggested action: {group['suggested_action']}", file=sys.stderr)
+    if debug_artifact_path:
+        print(f"[INFO]  Debug artifact: {debug_artifact_path}", file=sys.stderr)
 
 
 def _ratio(numerator: int, denominator: int) -> float:
@@ -955,34 +1049,81 @@ def summarize_drawers(drawers: list[dict[str, Any]]) -> dict[str, Any]:
 def export_drawers(source_palace: Path, export_dir: Path) -> dict[str, Any]:
     detection = detect_palace_format(source_palace)
     if detection.classification != CLASS_CHROMA_0_6:
-        raise RuntimeError(
-            f"Refusing export: source palace must classify as chroma_0_6, got {detection.classification}"
+        _raise_cli_error(
+            stage="export",
+            category="structural",
+            summary="source palace is not classified as chroma_0_6",
+            details=[f"detected classification: {detection.classification}"],
+            where_to_look=[str(source_palace)],
+            suggested_action="Run the prototype only against a preserved chroma_0_6 source palace or inspect format detection before retrying.",
         )
 
     db_path = _source_db_path(source_palace)
     if not db_path.exists():
-        raise RuntimeError(f"Refusing export: source palace database is missing at {db_path}")
+        _raise_cli_error(
+            stage="export",
+            category="structural",
+            summary="source palace database is missing",
+            details=[f"expected sqlite path: {db_path}"],
+            where_to_look=[str(source_palace)],
+            suggested_action="Verify the palace path and make sure chroma.sqlite3 exists before retrying export.",
+        )
 
     if export_dir.exists():
-        raise RuntimeError(f"Refusing export: output directory already exists at {export_dir}")
+        _raise_cli_error(
+            stage="export",
+            category="structural",
+            summary="output directory already exists",
+            details=[f"output directory: {export_dir}"],
+            where_to_look=[str(export_dir)],
+            suggested_action="Choose a new empty export directory so the bundle is created deterministically.",
+        )
 
     source_integrity = _source_sqlite_integrity(db_path)
     drawers = extract_drawers_from_sqlite(db_path)
     if not drawers:
-        raise RuntimeError("Refusing export: no drawers were extracted from the source palace")
+        _raise_cli_error(
+            stage="export",
+            category="data integrity",
+            summary="no drawers were extracted from the source palace",
+            details=[f"sqlite path: {db_path}"],
+            where_to_look=[str(db_path)],
+            suggested_action="Inspect the source SQLite contents and confirm the embeddings and embedding_metadata tables contain MemPalace drawers.",
+        )
 
     export_analysis = _analyze_drawers(drawers)
     export_issues = _source_export_issues(source_integrity, export_analysis)
     if export_issues:
-        raise RuntimeError(f"Refusing export: source integrity checks failed: {'; '.join(export_issues)}")
+        _raise_cli_error(
+            stage="export",
+            category="data integrity",
+            summary="source palace failed integrity checks before bundle generation",
+            details=export_issues,
+            where_to_look=[str(db_path), str(source_palace / "mempalace-bridge-manifest.json")],
+            suggested_action="Inspect the referenced sqlite rows or drawer ids, repair the source data, and rerun export without modifying the original palace in place.",
+        )
 
     summary = summarize_drawers(drawers)
     retrieval_queries = build_retrieval_query_plan(drawers)
     if not retrieval_queries["queries"]:
-        raise RuntimeError("Refusing export: could not build any deterministic retrieval validation queries")
+        _raise_cli_error(
+            stage="export",
+            category="structural",
+            summary="bundle generation could not build deterministic retrieval validation queries",
+            details=[f"drawer count: {summary['drawer_count']}"],
+            where_to_look=[str(db_path)],
+            suggested_action="Check whether the exported documents contain usable text content and rerun export after fixing empty or malformed drawers.",
+        )
     usage_scenarios = build_usage_scenario_plan(drawers)
     if not usage_scenarios["scenarios"]:
-        raise RuntimeError("Refusing export: could not build any deterministic usage scenarios")
+        _raise_cli_error(
+            stage="export",
+            category="structural",
+            summary="bundle generation could not build deterministic usage scenarios",
+            details=[f"drawer count: {summary['drawer_count']}"],
+            where_to_look=[str(db_path)],
+            suggested_action="Inspect the exported drawer documents and metadata, then retry once the source data has usable retrieval anchors.",
+        )
     export_dir.mkdir(parents=True, exist_ok=False)
 
     manifest = {
@@ -1368,12 +1509,27 @@ def ensure_target_is_safe(target_palace: Path) -> None:
         return
 
     if not target_palace.is_dir():
-        raise RuntimeError(f"Refusing import: target path is not a directory: {target_palace}")
+        _raise_cli_error(
+            stage="import",
+            category="structural",
+            summary="target path exists but is not a directory",
+            details=[f"target path: {target_palace}"],
+            where_to_look=[str(target_palace)],
+            suggested_action="Choose a fresh target directory for the reconstructed palace and retry.",
+        )
 
     existing = list(target_palace.iterdir())
     if existing:
-        raise RuntimeError(
-            f"Refusing import: target directory must be empty to avoid overwrite: {target_palace}"
+        _raise_cli_error(
+            stage="import",
+            category="structural",
+            summary="target directory is not empty and import would overwrite existing data",
+            details=[
+                f"target directory: {target_palace}",
+                f"existing entries: {_preview_items(sorted(entry.name for entry in existing))}",
+            ],
+            where_to_look=[str(target_palace)],
+            suggested_action="Use a new empty target directory or remove the existing target contents before retrying.",
         )
 
 
@@ -1383,33 +1539,75 @@ def import_drawers(export_dir: Path, target_palace: Path) -> dict[str, Any]:
     export_analysis = _analyze_drawers(drawers)
     export_issues = _bundle_integrity_issues(manifest, export_analysis)
     if export_issues:
-        raise RuntimeError(f"Refusing import: export bundle integrity checks failed: {'; '.join(export_issues)}")
+        _raise_cli_error(
+            stage="import",
+            category="data integrity",
+            summary="export bundle failed integrity checks before import",
+            details=export_issues,
+            where_to_look=[str(export_dir), str(export_dir / DRAWERS_FILENAME), str(export_dir / EXPORT_MANIFEST_FILENAME)],
+            suggested_action="Inspect the bundle manifest and drawers file for the listed issues, then regenerate the bundle from a clean source palace.",
+        )
     load_retrieval_query_plan_from_bundle(export_dir, manifest)
     load_usage_scenario_plan_from_bundle(export_dir, manifest, drawers)
 
     if manifest.get("source", {}).get("detected_format") != CLASS_CHROMA_0_6:
-        raise RuntimeError(
-            "Refusing import: export bundle does not declare a chroma_0_6 source palace"
+        _raise_cli_error(
+            stage="import",
+            category="structural",
+            summary="export bundle does not declare a chroma_0_6 source palace",
+            details=[f"declared source format: {manifest.get('source', {}).get('detected_format')}"],
+            where_to_look=[str(export_dir / EXPORT_MANIFEST_FILENAME)],
+            suggested_action="Regenerate the export bundle from a supported chroma_0_6 source palace before importing.",
         )
 
     target_palace.mkdir(parents=True, exist_ok=True)
 
     import chromadb
 
-    client = chromadb.PersistentClient(path=str(target_palace))
-    collection = client.create_collection(
-        manifest["collection"]["name"], metadata=manifest["collection"]["metadata"]
-    )
+    try:
+        client = chromadb.PersistentClient(path=str(target_palace))
+        collection = client.create_collection(
+            manifest["collection"]["name"], metadata=manifest["collection"]["metadata"]
+        )
+    except Exception as exc:
+        _raise_cli_error(
+            stage="import",
+            category="structural",
+            summary="target runtime could not create the reconstructed collection",
+            details=[
+                f"collection: {manifest['collection']['name']}",
+                f"target palace: {target_palace}",
+                f"runtime error: {exc}",
+            ],
+            where_to_look=[str(target_palace), str(export_dir / EXPORT_MANIFEST_FILENAME)],
+            suggested_action="Check the target Python environment, chromadb installation, and collection metadata, then retry with a fresh target directory.",
+        )
 
     batch_size = 500
     imported = 0
     for index in range(0, len(drawers), batch_size):
         batch = drawers[index : index + batch_size]
-        collection.add(
-            ids=[drawer["id"] for drawer in batch],
-            documents=[drawer["document"] for drawer in batch],
-            metadatas=[drawer["metadata"] for drawer in batch],
-        )
+        batch_ids = [drawer["id"] for drawer in batch]
+        try:
+            collection.add(
+                ids=batch_ids,
+                documents=[drawer["document"] for drawer in batch],
+                metadatas=[drawer["metadata"] for drawer in batch],
+            )
+        except Exception as exc:
+            _raise_cli_error(
+                stage="import",
+                category="data integrity",
+                summary="target runtime rejected a batch during import",
+                details=[
+                    f"batch index: {index // batch_size + 1}",
+                    f"batch size: {len(batch)}",
+                    f"affected drawer ids: {_preview_items(batch_ids)}",
+                    f"runtime error: {exc}",
+                ],
+                where_to_look=[str(export_dir / DRAWERS_FILENAME), str(target_palace)],
+                suggested_action="Inspect the listed drawer ids in the export bundle and verify their documents and metadata are acceptable to the target runtime.",
+            )
         imported += len(batch)
 
     target_manifest = {
@@ -1453,17 +1651,46 @@ def record_retrieval_results(
 
     import chromadb
 
-    client = chromadb.PersistentClient(path=str(palace_path))
-    collection = client.get_collection(COLLECTION_NAME)
+    try:
+        client = chromadb.PersistentClient(path=str(palace_path))
+        collection = client.get_collection(COLLECTION_NAME)
+    except Exception as exc:
+        _raise_cli_error(
+            stage="retrieval recording",
+            category="structural",
+            summary="runtime could not open the MemPalace collection for retrieval checks",
+            details=[
+                f"palace path: {palace_path}",
+                f"collection: {COLLECTION_NAME}",
+                f"runtime error: {exc}",
+            ],
+            where_to_look=[str(palace_path), str(queries_path)],
+            suggested_action="Verify the palace path, runtime environment, and collection name before rerunning retrieval recording.",
+        )
     effective_top_k = min(query_plan["top_k"], collection.count())
 
     query_results: list[dict[str, Any]] = []
     for query in query_plan["queries"]:
-        response = collection.query(
-            query_texts=[query["query_text"]],
-            n_results=effective_top_k,
-            include=["documents", "metadatas", "distances"],
-        )
+        try:
+            response = collection.query(
+                query_texts=[query["query_text"]],
+                n_results=effective_top_k,
+                include=["documents", "metadatas", "distances"],
+            )
+        except Exception as exc:
+            _raise_cli_error(
+                stage="retrieval recording",
+                category="retrieval mismatch",
+                summary="runtime failed while executing a deterministic retrieval query",
+                details=[
+                    f"query id: {query['query_id']}",
+                    f"anchor id: {query['anchor_id']}",
+                    f"query text: {query['query_text']}",
+                    f"runtime error: {exc}",
+                ],
+                where_to_look=[str(queries_path), str(palace_path)],
+                suggested_action="Inspect the listed query in the retrieval plan and retry after confirming the target runtime can query the palace.",
+            )
 
         ids = list(response.get("ids", [[]])[0])
         documents = list(response.get("documents", [[]])[0])
@@ -1528,19 +1755,49 @@ def record_usage_results(
 
     import chromadb
 
-    client = chromadb.PersistentClient(path=str(palace_path))
-    collection = client.get_collection(COLLECTION_NAME)
+    try:
+        client = chromadb.PersistentClient(path=str(palace_path))
+        collection = client.get_collection(COLLECTION_NAME)
+    except Exception as exc:
+        _raise_cli_error(
+            stage="usage recording",
+            category="structural",
+            summary="runtime could not open the MemPalace collection for usage checks",
+            details=[
+                f"palace path: {palace_path}",
+                f"collection: {COLLECTION_NAME}",
+                f"runtime error: {exc}",
+            ],
+            where_to_look=[str(palace_path), str(scenarios_path)],
+            suggested_action="Verify the palace path, runtime environment, and collection name before rerunning usage recording.",
+        )
     effective_top_k = min(scenario_plan["top_k"], collection.count())
 
     scenarios: list[dict[str, Any]] = []
     for scenario in scenario_plan["scenarios"]:
         steps: list[dict[str, Any]] = []
         for step in scenario["steps"]:
-            response = collection.query(
-                query_texts=[step["query_text"]],
-                n_results=effective_top_k,
-                include=["documents", "metadatas", "distances"],
-            )
+            try:
+                response = collection.query(
+                    query_texts=[step["query_text"]],
+                    n_results=effective_top_k,
+                    include=["documents", "metadatas", "distances"],
+                )
+            except Exception as exc:
+                _raise_cli_error(
+                    stage="usage recording",
+                    category="retrieval mismatch",
+                    summary="runtime failed while executing a deterministic usage step",
+                    details=[
+                        f"scenario id: {scenario['scenario_id']}",
+                        f"step id: {step['step_id']}",
+                        f"anchor id: {scenario['anchor_id']}",
+                        f"query text: {step['query_text']}",
+                        f"runtime error: {exc}",
+                    ],
+                    where_to_look=[str(scenarios_path), str(palace_path)],
+                    suggested_action="Inspect the listed scenario step and confirm the selected runtime can query this palace.",
+                )
 
             ids = list(response.get("ids", [[]])[0])
             documents = list(response.get("documents", [[]])[0])
@@ -2338,6 +2595,7 @@ def validate_reconstruction(export_dir: Path, target_palace: Path) -> dict[str, 
         "checks": checks,
         "expected_drawer_count": expected_count,
         "actual_drawer_count": actual_count,
+        "fetched_drawer_count": len(target_drawers),
         "expected_wing_room_counts": expected_counts,
         "actual_wing_room_counts": actual_counts,
         "sample_ids_checked": sample_ids,
@@ -2371,6 +2629,202 @@ def validate_reconstruction(export_dir: Path, target_palace: Path) -> dict[str, 
         },
         "valid": all(checks.values()),
     }
+
+
+def _build_validation_error_groups(result: dict[str, Any]) -> list[dict[str, Any]]:
+    diagnostics = result["diagnostics"]
+    groups: list[dict[str, Any]] = []
+
+    structural_items: list[str] = []
+    if not result["checks"]["drawer_count_matches"]:
+        structural_items.append(
+            f"drawer count mismatch: expected {result['expected_drawer_count']} but target reports {result['actual_drawer_count']}"
+        )
+    if not result["checks"]["fetched_drawer_count_matches_collection"]:
+        structural_items.append(
+            f"collection count mismatch: collection.count()={result['actual_drawer_count']} but fetched {result['fetched_drawer_count']} drawers during validation"
+        )
+    if not result["checks"]["wing_room_counts_match"]:
+        structural_items.append("wing/room counts differ between export bundle and target collection")
+    if not result["checks"]["sample_ids_present"]:
+        missing_samples = sorted(set(result["sample_ids_checked"]) - set(result["sample_ids_found"]))
+        structural_items.append(f"sample drawer ids missing from target: {_preview_items(missing_samples)}")
+    if not result["checks"]["target_manifest_present"]:
+        structural_items.append("target reconstruction manifest is missing")
+    if not result["checks"]["export_bundle_integrity_ok"]:
+        structural_items.extend(diagnostics["export_bundle_issues"])
+    if structural_items:
+        groups.append(
+            {
+                "category": "structural",
+                "items": structural_items,
+                "where_to_look": [
+                    result["export_dir"],
+                    result["target_palace"],
+                    f"{result['target_palace']}/{TARGET_MANIFEST_FILENAME}",
+                ],
+                "suggested_action": "Start by checking the bundle manifest, target manifest, and wing/room counts before inspecting individual drawers.",
+            }
+        )
+
+    data_integrity_items: list[str] = []
+    ids = diagnostics["ids"]
+    content = diagnostics["content"]
+    metadata = diagnostics["metadata"]
+    embeddings = diagnostics["embeddings"]
+    if ids["missing_in_target"]:
+        data_integrity_items.append(f"missing drawers in target: {_preview_items(ids['missing_in_target'])}")
+    if ids["unexpected_in_target"]:
+        data_integrity_items.append(f"unexpected drawers in target: {_preview_items(ids['unexpected_in_target'])}")
+    if ids["duplicate_in_export"]:
+        data_integrity_items.append(f"duplicate drawer ids in export: {_preview_items(ids['duplicate_in_export'])}")
+    if ids["duplicate_in_target"]:
+        data_integrity_items.append(f"duplicate drawer ids in target: {_preview_items(ids['duplicate_in_target'])}")
+    if content["mismatched_ids"]:
+        data_integrity_items.append(f"content hash mismatches: {_preview_items(content['mismatched_ids'])}")
+    if metadata["mismatched_ids"]:
+        data_integrity_items.append(f"metadata mismatches: {_preview_items(metadata['mismatched_ids'])}")
+    if metadata["missing_keys_in_target"]:
+        drawer_id = sorted(metadata["missing_keys_in_target"])[0]
+        data_integrity_items.append(
+            f"metadata keys missing in target for {drawer_id}: {_preview_items(metadata['missing_keys_in_target'][drawer_id])}"
+        )
+    if embeddings.get("missing_ids"):
+        data_integrity_items.append(f"drawers missing embeddings: {_preview_items(embeddings['missing_ids'])}")
+    if data_integrity_items:
+        groups.append(
+            {
+                "category": "data integrity",
+                "items": data_integrity_items,
+                "where_to_look": [
+                    f"{result['export_dir']}/{DRAWERS_FILENAME}",
+                    result["target_palace"],
+                ],
+                "suggested_action": "Inspect the listed drawer ids in the export bundle and compare them with the target collection contents.",
+            }
+        )
+
+    return groups
+
+
+def _build_retrieval_error_groups(result: dict[str, Any]) -> list[dict[str, Any]]:
+    groups: list[dict[str, Any]] = []
+    structural_items: list[str] = []
+    if not result["checks"]["query_plan_matches"]:
+        structural_items.append("source and target retrieval result bundles do not share the same query plan or top_k")
+    if structural_items:
+        groups.append(
+            {
+                "category": "structural",
+                "items": structural_items,
+                "where_to_look": [result["source_results_path"], result["target_results_path"]],
+                "suggested_action": "Re-record source and target retrieval results from the same export bundle before comparing them again.",
+            }
+        )
+
+    mismatch_items: list[str] = []
+    for query in result["queries"]:
+        if not query["mismatches"]:
+            continue
+        mismatch_items.append(
+            f"{query['query_id']} anchor={query['anchor_id']} source={query['source_result_count']} "
+            f"target={query['target_result_count']} overlap={query['overlap_count']} "
+            f"issues={_preview_items(query['mismatches'])}"
+        )
+    if mismatch_items:
+        groups.append(
+            {
+                "category": "retrieval mismatch",
+                "items": mismatch_items,
+                "where_to_look": [result["source_results_path"], result["target_results_path"]],
+                "suggested_action": "Review the listed query ids and anchor drawers in the retrieval result artifacts to see whether the target missed the expected semantic neighborhood.",
+            }
+        )
+
+    return groups
+
+
+def _build_usage_error_groups(result: dict[str, Any]) -> list[dict[str, Any]]:
+    groups: list[dict[str, Any]] = []
+    if not result["checks"]["scenario_plan_matches"]:
+        groups.append(
+            {
+                "category": "structural",
+                "items": ["source and target usage result bundles do not share the same scenario plan or top_k"],
+                "where_to_look": [result["source_results_path"], result["target_results_path"]],
+                "suggested_action": "Re-record usage results from the same export bundle before comparing them again.",
+            }
+        )
+
+    mismatch_items: list[str] = []
+    for scenario in result["scenarios"]:
+        if scenario["recommendation"] == USAGE_ACCEPTABLE:
+            continue
+        step_summaries = [
+            f"{step['step_id']} issues={_preview_items(step['mismatches'])}"
+            for step in scenario["steps"]
+            if step["mismatches"]
+        ]
+        mismatch_items.append(
+            f"{scenario['scenario_id']} type={scenario['scenario_type']} recommendation={scenario['recommendation']} "
+            f"steps={_preview_items(step_summaries)}"
+        )
+    if mismatch_items:
+        groups.append(
+            {
+                "category": "retrieval mismatch",
+                "items": mismatch_items,
+                "where_to_look": [result["source_results_path"], result["target_results_path"]],
+                "suggested_action": "Inspect the listed scenarios step by step to see where target retrieval diverged from the source behavior.",
+            }
+        )
+    return groups
+
+
+def _build_mcp_runtime_error_groups(result: dict[str, Any]) -> list[dict[str, Any]]:
+    diagnostics = result["diagnostics"]
+    groups: list[dict[str, Any]] = []
+    structural_items: list[str] = []
+    if not result["checks"]["server_started"]:
+        structural_items.append("server did not stay alive long enough to serve MCP requests")
+    if not result["checks"]["initialize_succeeded"]:
+        structural_items.append("MCP initialize did not succeed")
+    if not result["checks"]["required_tools_available"]:
+        structural_items.append(
+            f"required tools missing: expected mempalace_status, mempalace_get_taxonomy, mempalace_search but got {_preview_items(diagnostics['tools_available'])}"
+        )
+    if not result["checks"]["status_matches_drawer_count"]:
+        structural_items.append("mempalace_status drawer count does not match the export bundle")
+    if not result["checks"]["taxonomy_matches_export"]:
+        structural_items.append("MCP taxonomy does not match export wing/room counts")
+    if structural_items:
+        groups.append(
+            {
+                "category": "structural",
+                "items": structural_items,
+                "where_to_look": [result["palace_path"], result["launcher_script"]],
+                "suggested_action": "Check MCP startup, the selected launcher, and the target palace path before trusting runtime behavior.",
+            }
+        )
+
+    mismatch_items = [
+        f"{query['query_id']} anchor={query['anchor_id']} results={query['result_count']} issues={_preview_items(query['mismatches'])}"
+        for query in diagnostics["queries"]
+        if query["mismatches"]
+    ]
+    if mismatch_items or diagnostics["stderr_preview"]:
+        items = mismatch_items.copy()
+        if diagnostics["stderr_preview"]:
+            items.append(f"server stderr preview: {_preview_items(diagnostics['stderr_preview'])}")
+        groups.append(
+            {
+                "category": "retrieval mismatch",
+                "items": items,
+                "where_to_look": [result["palace_path"]],
+                "suggested_action": "Inspect the MCP search responses for the listed queries and compare them with the export bundle anchors.",
+            }
+        )
+    return groups
 
 
 def _print_export_result(manifest: dict[str, Any], export_dir: Path) -> None:
@@ -2476,6 +2930,14 @@ def _print_validation_result(result: dict[str, Any]) -> None:
     elif not embeddings["accessible"]:
         print(f"[INFO]  Embedding check skipped: {embeddings['reason']}")
 
+    if not result["valid"]:
+        error_groups = _build_validation_error_groups(result)
+        debug_artifact_path = _write_debug_artifact(
+            Path(result["export_dir"]) / VALIDATION_DEBUG_FILENAME,
+            {"error_groups": error_groups, "result": result},
+        )
+        _print_error_groups("Validation failure summary", error_groups, debug_artifact_path=debug_artifact_path)
+
 
 def _print_retrieval_comparison_result(result: dict[str, Any]) -> None:
     if result["valid"]:
@@ -2514,6 +2976,14 @@ def _print_retrieval_comparison_result(result: dict[str, Any]) -> None:
                 file=sys.stderr,
             )
 
+    if not result["valid"]:
+        error_groups = _build_retrieval_error_groups(result)
+        debug_artifact_path = _write_debug_artifact(
+            Path(result["target_results_path"]).resolve().parent / RETRIEVAL_DEBUG_FILENAME,
+            {"error_groups": error_groups, "result": result},
+        )
+        _print_error_groups("Retrieval failure summary", error_groups, debug_artifact_path=debug_artifact_path)
+
 
 def _print_mcp_runtime_result(result: dict[str, Any]) -> None:
     if result["valid"]:
@@ -2550,6 +3020,14 @@ def _print_mcp_runtime_result(result: dict[str, Any]) -> None:
             f"[INFO]  Server stderr: {_preview_items(diagnostics['stderr_preview'])}",
             file=sys.stderr,
         )
+
+    if not result["valid"]:
+        error_groups = _build_mcp_runtime_error_groups(result)
+        debug_artifact_path = _write_debug_artifact(
+            Path(result["export_dir"]) / MCP_RUNTIME_DEBUG_FILENAME,
+            {"error_groups": error_groups, "result": result},
+        )
+        _print_error_groups("MCP runtime failure summary", error_groups, debug_artifact_path=debug_artifact_path)
 
 
 def _print_usage_comparison_result(result: dict[str, Any]) -> None:
@@ -2603,6 +3081,14 @@ def _print_usage_comparison_result(result: dict[str, Any]) -> None:
                     f"{_preview_items(step['overlap_ids'])}",
                     file=sys.stderr,
                 )
+
+    if not result["valid"]:
+        error_groups = _build_usage_error_groups(result)
+        debug_artifact_path = _write_debug_artifact(
+            Path(result["target_results_path"]).resolve().parent / USAGE_DEBUG_FILENAME,
+            {"error_groups": error_groups, "result": result},
+        )
+        _print_error_groups("Usage failure summary", error_groups, debug_artifact_path=debug_artifact_path)
 
 
 def main() -> int:
@@ -2848,6 +3334,9 @@ def main() -> int:
         else:
             _print_validation_result(result)
         return 0 if result["valid"] else 1
+    except ReconstructionCliError as exc:
+        _print_cli_error(exc)
+        return 1
     except RuntimeError as exc:
         print(f"[ERROR] {exc}", file=sys.stderr)
         return 1
