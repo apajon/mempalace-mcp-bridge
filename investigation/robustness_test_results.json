@@ -1,12 +1,12 @@
 {
-  "created_at": "2026-04-17T18:49:30Z",
-  "work_directory": "/tmp/robustness_jgfokqmp",
+  "created_at": "2026-04-17T19:07:37Z",
+  "work_directory": "/tmp/robustness_bsdg08bo",
   "case_count": 19,
   "outcome_counts": {
     "full_success": 7,
     "degraded": 0,
-    "partial_failure": 10,
-    "hard_failure": 2
+    "partial_failure": 12,
+    "hard_failure": 0
   },
   "results": [
     {
@@ -404,14 +404,14 @@
           "category": "data integrity",
           "summary": "no drawers were extracted from the source palace",
           "details": [
-            "sqlite path: /tmp/robustness_jgfokqmp/palaces/empty_palace/chroma.sqlite3"
+            "sqlite path: /tmp/robustness_bsdg08bo/palaces/empty_palace/chroma.sqlite3"
           ]
         }
       },
       "outcome": "partial_failure",
       "outcome_reason": "export rejected: no drawers were extracted from the source palace",
       "root_cause_class": "expected_limitation",
-      "error_message": "no drawers were extracted from the source palace: sqlite path: /tmp/robustness_jgfokqmp/palaces/empty_palace/chroma.sqlite3",
+      "error_message": "no drawers were extracted from the source palace: sqlite path: /tmp/robustness_bsdg08bo/palaces/empty_palace/chroma.sqlite3",
       "traceback": null
     },
     {
@@ -437,14 +437,14 @@
       "stages": {
         "extract": {
           "status": "error",
-          "error": "file is not a database"
+          "error": "source palace database query failed: file is not a database: sqlite path: /tmp/robustness_bsdg08bo/palaces/corrupted_sqlite/chroma.sqlite3"
         }
       },
-      "outcome": "hard_failure",
-      "outcome_reason": "extract crashed: file is not a database",
+      "outcome": "partial_failure",
+      "outcome_reason": "extract rejected: source palace database query failed: file is not a database",
       "root_cause_class": "expected_limitation",
-      "error_message": "file is not a database",
-      "traceback": "Traceback (most recent call last):\n  File \"/home/adrienpagon/git/mempalace-mcp-bridge/scripts/investigation/robustness_harness.py\", line 82, in _run_case\n    drawers = extract_drawers_from_sqlite(db_path)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/adrienpagon/git/mempalace-mcp-bridge/scripts/palace_reconstruction_prototype.py\", line 974, in extract_drawers_from_sqlite\n    rows = conn.execute(\n           ^^^^^^^^^^^^^\nsqlite3.DatabaseError: file is not a database\n"
+      "error_message": "source palace database query failed: file is not a database: sqlite path: /tmp/robustness_bsdg08bo/palaces/corrupted_sqlite/chroma.sqlite3",
+      "traceback": null
     },
     {
       "case": "wrong_schema",
@@ -453,14 +453,14 @@
       "stages": {
         "extract": {
           "status": "error",
-          "error": "no such table: embeddings"
+          "error": "source palace database query failed: no such table: embeddings: sqlite path: /tmp/robustness_bsdg08bo/palaces/wrong_schema/chroma.sqlite3"
         }
       },
-      "outcome": "hard_failure",
-      "outcome_reason": "extract crashed: no such table: embeddings",
+      "outcome": "partial_failure",
+      "outcome_reason": "extract rejected: source palace database query failed: no such table: embeddings",
       "root_cause_class": "expected_limitation",
-      "error_message": "no such table: embeddings",
-      "traceback": "Traceback (most recent call last):\n  File \"/home/adrienpagon/git/mempalace-mcp-bridge/scripts/investigation/robustness_harness.py\", line 82, in _run_case\n    drawers = extract_drawers_from_sqlite(db_path)\n              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/adrienpagon/git/mempalace-mcp-bridge/scripts/palace_reconstruction_prototype.py\", line 974, in extract_drawers_from_sqlite\n    rows = conn.execute(\n           ^^^^^^^^^^^^^\nsqlite3.OperationalError: no such table: embeddings\n"
+      "error_message": "source palace database query failed: no such table: embeddings: sqlite path: /tmp/robustness_bsdg08bo/palaces/wrong_schema/chroma.sqlite3",
+      "traceback": null
     },
     {
       "case": "mixed_format_signals",

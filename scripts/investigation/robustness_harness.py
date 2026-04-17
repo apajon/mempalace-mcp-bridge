@@ -84,6 +84,13 @@ def _run_case(case_info: dict[str, Any], work_root: Path) -> dict[str, Any]:
             "drawer_count": len(drawers),
             "sample_ids": [d["id"] for d in drawers[:5]],
         }
+    except ReconstructionCliError as exc:
+        result["stages"]["extract"] = {"status": "error", "error": str(exc)}
+        result["outcome"] = OUTCOME_PARTIAL_FAILURE
+        result["outcome_reason"] = f"extract rejected: {exc.summary}"
+        result["root_cause_class"] = _classify_cli_error(exc)
+        result["error_message"] = str(exc)
+        return result
     except Exception as exc:
         result["stages"]["extract"] = {"status": "error", "error": str(exc)}
         result["outcome"] = OUTCOME_HARD_FAILURE

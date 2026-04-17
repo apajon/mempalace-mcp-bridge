@@ -25,9 +25,11 @@ from palace_reconstruction_prototype import (  # type: ignore
     USAGE_DEBUG_FILENAME,
     VALIDATION_DEBUG_FILENAME,
     COLLECTION_NAME,
+    ReconstructionCliError,
     compare_usage_results,
     compare_retrieval_results,
     export_drawers,
+    extract_drawers_from_sqlite,
     import_drawers,
     record_usage_results,
     record_retrieval_results,
@@ -785,6 +787,74 @@ class PalaceReconstructionPrototypeTests(unittest.TestCase):
         self.assertIn("anchor=", combined_output)
         self.assertIn("Suggested action:", combined_output)
         self.assertTrue(debug_path.exists())
+
+    # -- SQLite error wrapping tests --
+
+    def test_corrupted_sqlite_raises_structured_error(self) -> None:
+        palace = self.root / "corrupted-palace"
+        palace.mkdir(parents=True, exist_ok=True)
+        manifest = {"compatibility_line": "chromadb-0.6.x", "chromadb_version": "0.6.3"}
+        (palace / "mempalace-bridge-manifest.json").write_text(
+            json.dumps(manifest), encoding="utf-8"
+        )
+        (palace / "chroma.sqlite3").write_bytes(b"NOT A DATABASE FILE AT ALL")
+
+        with self.assertRaises(ReconstructionCliError) as ctx:
+            extract_drawers_from_sqlite(palace / "chroma.sqlite3")
+        self.assertEqual(ctx.exception.stage, "export")
+        self.assertEqual(ctx.exception.category, "structural")
+        self.assertIn("database", ctx.exception.summary.lower())
+
+    def test_wrong_schema_raises_structured_error(self) -> None:
+        palace = self.root / "wrong-schema-palace"
+        palace.mkdir(parents=True, exist_ok=True)
+        manifest = {"compatibility_line": "chromadb-0.6.x", "chromadb_version": "0.6.3"}
+        (palace / "mempalace-bridge-manifest.json").write_text(
+            json.dumps(manifest), encoding="utf-8"
+        )
+        conn = sqlite3.connect(palace / "chroma.sqlite3")
+        conn.execute("CREATE TABLE not_embeddings (id INTEGER PRIMARY KEY, data TEXT)")
+        conn.commit()
+        conn.close()
+
+        with self.assertRaises(ReconstructionCliError) as ctx:
+            extract_drawers_from_sqlite(palace / "chroma.sqlite3")
+        self.assertEqual(ctx.exception.stage, "export")
+        self.assertEqual(ctx.exception.category, "structural")
+        self.assertIn("query failed", ctx.exception.summary)
+
+    def test_corrupted_sqlite_export_raises_structured_error(self) -> None:
+        palace = self.root / "corrupted-export"
+        palace.mkdir(parents=True, exist_ok=True)
+        manifest = {"compatibility_line": "chromadb-0.6.x", "chromadb_version": "0.6.3"}
+        (palace / "mempalace-bridge-manifest.json").write_text(
+            json.dumps(manifest), encoding="utf-8"
+        )
+        (palace / "chroma.sqlite3").write_bytes(b"GARBAGE BYTES")
+        export_dir = self.root / "corrupted-export-out"
+
+        with self.assertRaises(ReconstructionCliError) as ctx:
+            export_drawers(palace, export_dir)
+        self.assertEqual(ctx.exception.stage, "export")
+        self.assertEqual(ctx.exception.category, "structural")
+
+    def test_wrong_schema_export_raises_structured_error(self) -> None:
+        palace = self.root / "wrong-schema-export"
+        palace.mkdir(parents=True, exist_ok=True)
+        manifest = {"compatibility_line": "chromadb-0.6.x", "chromadb_version": "0.6.3"}
+        (palace / "mempalace-bridge-manifest.json").write_text(
+            json.dumps(manifest), encoding="utf-8"
+        )
+        conn = sqlite3.connect(palace / "chroma.sqlite3")
+        conn.execute("CREATE TABLE wrong_table (id INTEGER PRIMARY KEY)")
+        conn.commit()
+        conn.close()
+        export_dir = self.root / "wrong-schema-export-out"
+
+        with self.assertRaises(ReconstructionCliError) as ctx:
+            export_drawers(palace, export_dir)
+        self.assertEqual(ctx.exception.stage, "export")
+        self.assertEqual(ctx.exception.category, "structural")
 
 
 if __name__ == "__main__":

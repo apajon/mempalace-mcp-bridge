@@ -725,8 +725,18 @@ def build_usage_scenario_plan(
 
 
 def _source_sqlite_integrity(db_path: Path) -> dict[str, Any]:
-    conn = sqlite3.connect(str(db_path))
-    conn.row_factory = sqlite3.Row
+    try:
+        conn = sqlite3.connect(str(db_path))
+        conn.row_factory = sqlite3.Row
+    except sqlite3.Error as exc:
+        _raise_cli_error(
+            stage="export",
+            category="structural",
+            summary=f"source palace database is unreadable: {exc}",
+            details=[f"sqlite path: {db_path}"],
+            where_to_look=[str(db_path)],
+            suggested_action="The database file may be corrupted or not a valid SQLite database. Verify the file integrity.",
+        )
     try:
         embedding_row_count = conn.execute("SELECT COUNT(*) AS count FROM embeddings").fetchone()["count"]
 
@@ -821,6 +831,15 @@ def _source_sqlite_integrity(db_path: Path) -> dict[str, Any]:
                 [blank_id_rows, duplicate_ids, document_row_issues, duplicate_metadata_keys]
             ),
         }
+    except sqlite3.Error as exc:
+        _raise_cli_error(
+            stage="export",
+            category="structural",
+            summary=f"source palace database query failed: {exc}",
+            details=[f"sqlite path: {db_path}"],
+            where_to_look=[str(db_path)],
+            suggested_action="The database may have an unexpected schema or be corrupted. Inspect the SQLite file manually.",
+        )
     finally:
         conn.close()
 
@@ -968,8 +987,18 @@ def _source_export_issues(source_integrity: dict[str, Any], export_analysis: dic
 
 
 def extract_drawers_from_sqlite(db_path: Path) -> list[dict[str, Any]]:
-    conn = sqlite3.connect(str(db_path))
-    conn.row_factory = sqlite3.Row
+    try:
+        conn = sqlite3.connect(str(db_path))
+        conn.row_factory = sqlite3.Row
+    except sqlite3.Error as exc:
+        _raise_cli_error(
+            stage="export",
+            category="structural",
+            summary=f"source palace database is unreadable: {exc}",
+            details=[f"sqlite path: {db_path}"],
+            where_to_look=[str(db_path)],
+            suggested_action="The database file may be corrupted or not a valid SQLite database. Verify the file integrity.",
+        )
     try:
         rows = conn.execute(
             """
@@ -1017,6 +1046,15 @@ def extract_drawers_from_sqlite(db_path: Path) -> list[dict[str, Any]]:
             )
 
         return drawers
+    except sqlite3.Error as exc:
+        _raise_cli_error(
+            stage="export",
+            category="structural",
+            summary=f"source palace database query failed: {exc}",
+            details=[f"sqlite path: {db_path}"],
+            where_to_look=[str(db_path)],
+            suggested_action="The database may have an unexpected schema or be corrupted. Inspect the SQLite file manually.",
+        )
     finally:
         conn.close()
 
