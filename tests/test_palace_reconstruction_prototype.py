@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -16,9 +17,13 @@ if str(SCRIPTS_DIR) not in sys.path:
 from palace_reconstruction_prototype import (  # type: ignore
     DRAWERS_FILENAME,
     EXPORT_MANIFEST_FILENAME,
+    MCP_RUNTIME_DEBUG_FILENAME,
     RETRIEVAL_QUERIES_FILENAME,
+    RETRIEVAL_DEBUG_FILENAME,
     TARGET_MANIFEST_FILENAME,
     USAGE_SCENARIOS_FILENAME,
+    USAGE_DEBUG_FILENAME,
+    VALIDATION_DEBUG_FILENAME,
     COLLECTION_NAME,
     compare_usage_results,
     compare_retrieval_results,
@@ -172,6 +177,24 @@ class PalaceReconstructionPrototypeTests(unittest.TestCase):
             metadatas=[dict(row["metadata"]) for row in rows],
         )
         return palace
+
+    def _run_reconstruct_script(self, *args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["bash", str(SCRIPTS_DIR / "reconstruct.sh"), *args],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+    def _run_prototype_script(self, *args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [str(REPO_ROOT / ".venv/bin/python"), str(SCRIPTS_DIR / "palace_reconstruction_prototype.py"), *args],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
 
     def test_summarize_drawers_counts_wings_and_rooms(self) -> None:
         summary = summarize_drawers(
@@ -536,6 +559,232 @@ class PalaceReconstructionPrototypeTests(unittest.TestCase):
             comparison["summary"]["degraded_scenarios"] + comparison["summary"]["unusable_scenarios"],
             1,
         )
+
+    def test_reconstruct_script_dry_run_lists_full_pipeline(self) -> None:
+        source = self._write_queryable_palace(name="source-palace")
+        target = self.root / "target-palace"
+        work_dir = self.root / "work-dir"
+
+        result = self._run_reconstruct_script(
+            "--source-palace",
+            str(source),
+            "--target-palace",
+            str(target),
+            "--work-dir",
+            str(work_dir),
+            "--source-python",
+            str(REPO_ROOT / ".venv/bin/python"),
+            "--target-python",
+            str(REPO_ROOT / ".venv/bin/python"),
+            "--with-usage",
+            "--with-mcp-runtime",
+            "--dry-run",
+        )
+
+        self.assertEqual(result.returncode, 0, msg=result.stderr)
+        self.assertIn("Step 1/10", result.stdout)
+        self.assertIn("Step 10/10", result.stdout)
+        self.assertIn("record-retrieval", result.stdout)
+        self.assertIn("compare-usage", result.stdout)
+        self.assertIn("validate-mcp-runtime", result.stdout)
+        self.assertFalse(work_dir.exists())
+
+    def test_reconstruct_script_runs_end_to_end(self) -> None:
+        source = self._write_queryable_palace(name="source-palace")
+        target = self.root / "target-palace"
+        work_dir = self.root / "work-dir"
+
+        result = self._run_reconstruct_script(
+            "--source-palace",
+            str(source),
+            "--target-palace",
+            str(target),
+            "--work-dir",
+            str(work_dir),
+            "--source-python",
+            str(REPO_ROOT / ".venv/bin/python"),
+            "--target-python",
+            str(REPO_ROOT / ".venv/bin/python"),
+            "--with-usage",
+            "--with-mcp-runtime",
+        )
+
+        combined_output = result.stdout + result.stderr
+        self.assertEqual(result.returncode, 0, msg=combined_output)
+        self.assertTrue((target / TARGET_MANIFEST_FILENAME).exists())
+        self.assertTrue((work_dir / "source-retrieval-results.json").exists())
+        self.assertTrue((work_dir / "target-retrieval-results.json").exists())
+        self.assertTrue((work_dir / "source-usage-results.json").exists())
+        self.assertTrue((work_dir / "target-usage-results.json").exists())
+        self.assertIn("Reconstruction validation passed", combined_output)
+        self.assertIn("Retrieval validation passed", combined_output)
+        self.assertIn("Usage comparison passed", combined_output)
+        self.assertIn("MCP runtime validation passed", combined_output)
+
+    def test_reconstruct_script_stops_on_export_failure(self) -> None:
+        source = self._write_source_palace(
+            [
+                {
+                    "row_id": 1,
+                    "id": "drawer_a",
+                    "document": "alpha text",
+                    "metadata": {"wing": "proj", "room": "docs"},
+                },
+                {
+                    "row_id": 2,
+                    "id": "drawer_a",
+                    "document": "beta text",
+                    "metadata": {"wing": "proj", "room": "code"},
+                },
+            ]
+        )
+        target = self.root / "target-palace"
+        work_dir = self.root / "work-dir"
+
+        result = self._run_reconstruct_script(
+            "--source-palace",
+            str(source),
+            "--target-palace",
+            str(target),
+            "--work-dir",
+            str(work_dir),
+            "--source-python",
+            str(REPO_ROOT / ".venv/bin/python"),
+            "--target-python",
+            str(REPO_ROOT / ".venv/bin/python"),
+        )
+
+        combined_output = result.stdout + result.stderr
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("duplicate source ids", combined_output)
+        self.assertFalse((target / TARGET_MANIFEST_FILENAME).exists())
+        self.assertFalse((work_dir / "source-retrieval-results.json").exists())
+
+    def test_export_cli_error_includes_category_and_action(self) -> None:
+        source = self._write_source_palace(
+            [
+                {
+                    "row_id": 1,
+                    "id": "drawer_a",
+                    "document": "alpha text",
+                    "metadata": {"wing": "proj", "room": "docs"},
+                },
+                {
+                    "row_id": 2,
+                    "id": "drawer_a",
+                    "document": "beta text",
+                    "metadata": {"wing": "proj", "room": "code"},
+                },
+            ]
+        )
+        export_dir = self.root / "export"
+
+        result = self._run_prototype_script("export", "--source-palace", str(source), "--output-dir", str(export_dir))
+
+        stderr = result.stderr
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Export failed: source palace failed integrity checks before bundle generation", stderr)
+        self.assertIn("Category: data integrity", stderr)
+        self.assertIn("duplicate source ids", stderr)
+        self.assertIn("Suggested action:", stderr)
+        self.assertIn(str(source / "chroma.sqlite3"), stderr)
+
+    def test_validate_cli_writes_debug_artifact_and_groups_errors(self) -> None:
+        source = self._write_source_palace()
+        export_dir = self.root / "export"
+        target = self.root / "target"
+
+        export_drawers(source, export_dir)
+        import_drawers(export_dir, target)
+
+        collection = self._open_target_collection(target)
+        collection.delete(ids=["drawer_a", "drawer_b"])
+        collection.add(
+            ids=["drawer_a"],
+            documents=["alpha text changed"],
+            metadatas=[{"wing": "proj", "chunk_index": 0}],
+        )
+        collection.upsert(
+            ids=["drawer_extra"],
+            documents=["unexpected text"],
+            metadatas=[{"wing": "proj", "room": "misc", "chunk_index": 9}],
+        )
+
+        result = self._run_prototype_script("validate", "--export-dir", str(export_dir), "--target-palace", str(target))
+
+        combined_output = result.stdout + result.stderr
+        debug_path = export_dir / VALIDATION_DEBUG_FILENAME
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Validation failure summary:", combined_output)
+        self.assertIn("Structural:", combined_output)
+        self.assertIn("Data integrity:", combined_output)
+        self.assertIn("missing drawers in target", combined_output)
+        self.assertIn("metadata mismatches", combined_output)
+        self.assertTrue(debug_path.exists())
+
+    def test_import_cli_error_includes_target_location_and_action(self) -> None:
+        source = self._write_source_palace()
+        export_dir = self.root / "export"
+        target = self.root / "target"
+
+        export_drawers(source, export_dir)
+        target.mkdir()
+        (target / "existing.txt").write_text("occupied", encoding="utf-8")
+
+        result = self._run_prototype_script("import", "--export-dir", str(export_dir), "--target-palace", str(target))
+
+        stderr = result.stderr
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Import failed: target directory is not empty", stderr)
+        self.assertIn("Category: structural", stderr)
+        self.assertIn("existing entries: existing.txt", stderr)
+        self.assertIn("Suggested action:", stderr)
+
+    def test_compare_retrieval_cli_writes_debug_artifact_and_groups_errors(self) -> None:
+        source = self._write_queryable_palace(name="source-palace")
+        export_dir = self.root / "export"
+        target = self.root / "target"
+        source_results = self.root / "source-retrieval.json"
+        target_results = self.root / "target-retrieval.json"
+
+        export_drawers(source, export_dir)
+        import_drawers(export_dir, target)
+
+        collection = self._open_target_collection(target)
+        collection.delete(ids=["drawer_alpha", "drawer_beta", "drawer_gamma"])
+        collection.add(
+            ids=["drawer_delta", "drawer_epsilon", "drawer_zeta"],
+            documents=[
+                "delta unrelated content about another topic",
+                "epsilon unrelated content about another topic",
+                "zeta unrelated content about another topic",
+            ],
+            metadatas=[
+                {"wing": "other", "room": "misc", "chunk_index": 10},
+                {"wing": "other", "room": "misc", "chunk_index": 11},
+                {"wing": "other", "room": "misc", "chunk_index": 12},
+            ],
+        )
+
+        record_retrieval_results(source, export_dir / RETRIEVAL_QUERIES_FILENAME, source_results, label="source")
+        record_retrieval_results(target, export_dir / RETRIEVAL_QUERIES_FILENAME, target_results, label="target")
+
+        result = self._run_prototype_script(
+            "compare-retrieval",
+            "--source-results",
+            str(source_results),
+            "--target-results",
+            str(target_results),
+        )
+
+        combined_output = result.stdout + result.stderr
+        debug_path = self.root / RETRIEVAL_DEBUG_FILENAME
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Retrieval failure summary:", combined_output)
+        self.assertIn("Retrieval mismatch:", combined_output)
+        self.assertIn("anchor=", combined_output)
+        self.assertIn("Suggested action:", combined_output)
+        self.assertTrue(debug_path.exists())
 
 
 if __name__ == "__main__":
