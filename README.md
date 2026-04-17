@@ -1,165 +1,253 @@
-# MemPalace MCP Bridge for VS Code Copilot
-
-Integration layer for running MemPalace as a guarded local MCP backend in VS Code Copilot Chat on the stable ChromaDB `0.6.x` line.
+# MemPalace MCP Bridge — Safe, Non-Destructive Migration to ChromaDB 1.x
 
 ---
 
-## What this repo is
+## What this is
 
-- An **integration layer** between MemPalace and VS Code Copilot Chat
-- A **reproducible setup** for local MCP-backed memory
-- A **guarded runtime** for the stable ChromaDB `0.6.x` line
-- A **`verify.sh` path** that confirms the bridge starts and reads the palace correctly
+A safe and explicit way to:
 
-It is **not**:
+- run MemPalace reliably today (0.6.x)
+- reconstruct a palace into a ChromaDB 1.x target
+- verify that the result actually works at runtime (MCP)
 
-- the MemPalace engine itself
-- a generic experimentation repo
-- a ChromaDB `1.x` compatibility layer
+---
+
+## Why this exists
+
+MemPalace is powerful, but real-world usage quickly hits two issues:
+
+- setup friction (manual installs, fragile configs)
+- **no safe migration path to newer ChromaDB versions**
+
+Typical approaches:
+- copy data blindly
+- assume runtime compatibility
+- validate only structure
+
+This leads to:
+- runtime failures
+- misleading “success”
+- hard-to-debug inconsistencies
+
+👉 A palace can look valid… and still be unusable.
+
+This project fixes that.
+
+> It turns MemPalace migration into a **controlled, explicit, and verifiable process**.
+
+---
+
+## Core guarantee
+
+This system enforces a strict invariant:
+
+- a migration either **succeeds and is validated**
+- or **fails explicitly**
+
+**No silent corruption. No ambiguous state.**
+
+---
+
+## What you actually get
+
+- non-destructive reconstruction (source is never modified)
+- rebuilt 1.x palace target
+- runtime compatibility checks
+- structured, actionable errors
+- validation at multiple levels:
+  - structure
+  - retrieval
+  - **real MCP runtime**
+
+---
+
+## What this project provides
+
+### 1. Stable usage (0.6.x path)
+- reproducible environment
+- predictable behavior
+- no hidden assumptions
+
+### 2. Safe reconstruction (1.x path)
+- source-preserving
+- explicit pipeline
+- validation at each stage
+
+### 3. Runtime compatibility detection
+- prevents mixing incompatible stacks (0.6.x vs 1.x)
+- eliminates misleading errors
+
+### 4. Validation tooling
+- structural checks
+- retrieval checks
+- **MCP runtime validation (server + tools + queries)**
+
+👉 The goal is simple:
+
+**Not just “data looks correct” — but “the system actually works”.**
+
+---
+
+## Migration guarantees (tested scope)
+
+- non-destructive behavior
+- no silent corruption
+- explicit failure model
+- runtime-valid reconstruction
+
+Reconstructed 1.x palaces have been validated against native 1.x:
+
+- same MCP tools exposed
+- same queries
+- same results
+- no semantic differences observed
+
+---
+
+## What makes this different
+
+Most migration tools ask:
+
+> “Did the data transfer succeed?”
+
+This project asks:
+
+> **“Does the system still behave correctly at runtime?”**
+
+Key differences:
+
+- runtime-level validation (not just storage)
+- adversarial testing (not just happy path)
+- explicit failure boundaries
+- no silent corruption
+
+---
+
+## Recommended workflow
+
+1. Stay on 0.6.x if you need stability today
+2. Reconstruct to 1.x using this pipeline
+3. Validate:
+   - structure
+   - retrieval
+   - runtime (MCP)
+4. Only use reconstructed palaces after validation
+5. If it fails → read the error, don’t guess
+
+---
 
 ## Quickstart
 
 ```bash
+# 1. Clone
 git clone https://github.com/apajon/mempalace-mcp-bridge.git
 cd mempalace-mcp-bridge
-bash setup.sh
-bash verify.sh
-code .
-```
 
-- Open the repository root folder in VS Code. Opening a subfolder prevents MCP from loading.
-- `verify.sh` should report **SUPPORTED and healthy** before you rely on the bridge.
+# 2. Setup
+./scripts/setup.sh
 
----
+# 3. Reconstruct
+python scripts/palace_reconstruction_prototype.py \
+  --source /path/to/source_palace \
+  --target /path/to/reconstructed_palace
 
-## What you get on the core path
-
-- Workspace MCP config generated automatically in `.mcp.json`
-- MCP server auto-start through VS Code / Copilot Chat
-- Local MemPalace storage under the normal palace path
-- Guarded launcher that rejects unsupported stable-path runtime combinations
-- `verify.sh` for end-to-end verification of environment, config, startup, and palace readability
-- Palace manifest for narrow version traceability
-- Stable compatibility policy for existing `0.6.x` palaces
+# 4. Validate runtime
+python scripts/investigation/runtime_load_test.py \
+  /path/to/reconstructed_palace
+````
 
 ---
 
-## Compatibility contract
+## Documentation
 
-This repository intentionally targets the tested ChromaDB `0.6.x` line:
+The documentation is organized by purpose:
 
-- supported line: `chromadb>=0.6,<0.7`
-- stable path: **ChromaDB `0.6.x` only**
-- ChromaDB `1.x`: **not supported on the stable path**
+### Core system
 
-The stable path prioritizes:
+* Architecture overview: [docs/architecture.md](docs/architecture.md)
+* Error model: [docs/error_model.md](docs/error_model.md)
+* Support matrix: [docs/support_matrix.md](docs/support_matrix.md)
+* Limitations: [docs/limitations.md](docs/limitations.md)
 
-- preservation of existing palaces
-- predictable setup
-- guarded execution
-- reproducible local behavior
+### Usage & workflows
 
-If the active runtime is outside the supported line, the guarded path is expected to fail.
+* CLI usage: [docs/cli_usage.md](docs/cli_usage.md)
+* Update and verify workflow: [docs/update_workflow.md](docs/update_workflow.md)
+* Troubleshooting: [docs/troubleshooting.md](docs/troubleshooting.md)
 
----
+### Advanced topics
 
-## Who this is for
+* Structured memory patterns: [docs/advanced_memory_strategy.md](docs/advanced_memory_strategy.md)
+* Structured memory example: [docs/memory_example.md](docs/memory_example.md)
+* Palace format detection: [docs/palace_format_detection.md](docs/palace_format_detection.md)
 
-Use this repo if:
+### Integration
 
-- you want MemPalace to work inside VS Code Copilot Chat without manual MCP wiring
-- you want a practical local setup, not a research project
-- you want verification before relying on the bridge
-- you already depend on existing palaces and want the stable `0.6.x` path
-
-Do not use this repo as your main path if your goal is ChromaDB `1.x` experimentation.
+* VS Code / MCP: [docs/mcp_vscode.md](docs/mcp_vscode.md)
+* Devcontainer integration: [docs/devcontainer_integration.md](docs/devcontainer_integration.md)
 
 ---
 
-## Advanced usage
+## What is NOT guaranteed
 
-Advanced material is secondary to the stable bridge path.
+This project is intentionally bounded.
 
-Mine your own data:
+It does NOT claim:
 
-```bash
-uv run --directory . mempalace mine /path/to/your/project
-```
+* universal compatibility with all MemPalace history
+* correctness on all real-world datasets
+* automatic repair of corrupted sources
 
-- Structured memory patterns: [docs/advanced_memory_strategy.md](docs/advanced_memory_strategy.md)
-- Architecture overview: [docs/architecture.md](docs/architecture.md)
-- VS Code / MCP details: [docs/mcp_vscode.md](docs/mcp_vscode.md)
-- Devcontainer integration: [docs/devcontainer_integration.md](docs/devcontainer_integration.md)
-- Troubleshooting: [docs/troubleshooting.md](docs/troubleshooting.md)
-- Update and verify workflow: [docs/update_workflow.md](docs/update_workflow.md)
+Unsupported / rejected inputs include:
 
----
+* corrupted SQLite databases
+* inconsistent metadata
+* duplicated identifiers
+* structurally incoherent palaces
 
-## Experimental: reconstruction workflow
-
-This repo includes a separate `0.6.x` -> `1.x` reconstruction workflow.
-
-Status:
-
-- **experimental**
-- **not part of the supported bridge path**
-- **not an in-place migration tool**
-- **not a supported upgrade path**
-
-Use it only for source-preserving evaluation with a disposable target.
-
-Documentation:
-
-- Workflow reference: [docs/chromadb_reconstruction_workflow.md](docs/chromadb_reconstruction_workflow.md)
-- Prototype details: [docs/chromadb_reconstruction_prototype.md](docs/chromadb_reconstruction_prototype.md)
-- Migration assessment: [docs/chromadb_reconstruction_migration.md](docs/chromadb_reconstruction_migration.md)
-- Experimental release strategy: [docs/chromadb_reconstruction_experimental_release.md](docs/chromadb_reconstruction_experimental_release.md)
-
-Do **not** treat this as evidence that ChromaDB `1.x` is supported by the bridge.
-
----
-
-## How this differs from the MemPalace core repo
-
-**MemPalace core repo** provides the memory engine:
-
-- mining
-- storage
-- retrieval
-- MCP server capabilities
-
-**This repo** provides the operating layer for a specific real workflow:
-
-- reproducible setup
-- MCP integration for VS Code Copilot Chat
-- guarded runtime
-- verification
-- stable `0.6.x` compatibility policy
-
-If you want the underlying memory system, use MemPalace itself:
-https://github.com/milla-jovovich/mempalace
+👉 These cases are **rejected explicitly**, never silently accepted.
 
 ---
 
 ## Limitations
 
-- Linux / WSL2 is the tested path today
-- Copilot behavior is still probabilistic even with instructions and MCP memory available
-- The stable bridge path does **not** support ChromaDB `1.x`
-- Reconstruction can validate rebuilt targets experimentally, but that still does **not** make `1.x` a supported bridge target
-- Automatic migration to ChromaDB `1.x` is not supported here
+* bounded to tested MemPalace / ChromaDB versions
+* assumes internally consistent source semantics
+* does not attempt data repair
 
 ---
 
-Stable release downloads:
-https://github.com/apajon/mempalace-mcp-bridge/releases
+## Project status
+
+This project provides:
+
+* a non-destructive reconstruction pipeline
+* runtime-valid 1.x targets (within tested scope)
+* explicit failure handling
+* zero silent corruption in tested adversarial cases
+
+It is not an experiment anymore.
+It is not a universal migration solution either.
+
+👉 It is a **safe, bounded, technically verified migration path**.
 
 ---
 
-## More docs
+## Philosophy
 
-| Topic | Link |
-|---|---|
-| Palace format detection | [docs/palace_format_detection.md](docs/palace_format_detection.md) |
-| Structured memory example | [docs/memory_example.md](docs/memory_example.md) |
-| MemPalace project | [github.com/milla-jovovich/mempalace](https://github.com/milla-jovovich/mempalace) |
+* Fail explicitly
+* Never guess
+* Validate behavior, not just structure
+* Prefer safety over convenience
+
+---
+
+## Related
+
+* MemPalace: [https://github.com/milla-jovovich/mempalace](https://github.com/milla-jovovich/mempalace)
+* ChromaDB: [https://github.com/chroma-core/chroma](https://github.com/chroma-core/chroma)
+
+---
+
+If something fails, it should fail clearly.
+If something works, it should work for the right reasons.
