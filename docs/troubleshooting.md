@@ -213,7 +213,7 @@ If startup or verification now stops with an error like:
 [ERROR] unsupported chromadb 1.x.y. This stable branch supports 0.6.x only. Run: bash update.sh
 ```
 
-that is the intended guardrail. This branch does not support ChromaDB `1.x`.
+that is the intended guardrail. This stable bridge does not support ChromaDB `1.x`.
 
 **Manual fix** (if the scripts are unavailable):
 

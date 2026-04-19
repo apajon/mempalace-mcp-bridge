@@ -51,7 +51,7 @@ Ambiguous structural cases resolve to `unknown`, including:
 
 ## Why `1.x` fallback stays conservative
 
-In current exploration samples, a fresh `1.x` palace used a SQLite schema that looked very similar to a `0.6.x` palace. The strongest observed difference was untyped `config_json_str` values (`{}`), but that shape is **not unique** to `1.x`; it can also appear in older incompatible storage.
+A `1.x` palace can use a SQLite schema similar to a `0.6.x` palace. One structural difference is untyped `config_json_str` values (`{}`), but that shape is **not unique** to `1.x`; it can also appear in older incompatible storage.
 
 Because of that, the detector does **not** infer `chroma_1_x` from structure alone in this first version.
 
