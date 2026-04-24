@@ -2,14 +2,35 @@
 
 Give [MemPalace](https://github.com/milla-jovovich/mempalace) a persistent local memory inside VS Code Copilot Chat.
 
+This repo provides a plug-and-play bridge:
+
+- one-command setup
+- generated workspace MCP config
+- automatic MCP server startup through VS Code
+- full-stack verification with `verify.sh`
+- a stable ChromaDB `0.6.x` line for existing palaces
+
 ---
 
-## What this is
+## What you get
 
-- a reproducible MemPalace environment (`setup.sh`, `update.sh`, `verify.sh`)
-- MCP server auto-start configuration for VS Code Copilot Chat
-- devcontainer integration (host palace mount, shared across environments)
-- safe ChromaDB 0.6.x ↔ 1.x reconstruction tooling (non-destructive, runtime-validated)
+- Persistent memory inside Copilot Chat
+- Fully local - no cloud, no API key, no Docker
+- Auto-start - no terminal, VS Code handles everything
+- Mine your own files - query your notes, docs, and decisions
+- Built-in verification - `verify.sh` classifies the bridge as healthy, suspicious, or unsafe by checking the environment, the generated MCP config, real MCP startup, and palace manifest drift
+- Palace safety checks - setup, update, verify, and runtime startup reject unsupported `chromadb` versions and keep the bridge on the tested `0.6.x` line
+- Palace format safety gate - risky stable-path operations refuse palaces detected as `chroma_1_x` or `unknown`
+- Palace manifest - setup writes `mempalace-bridge-manifest.json` into the palace root for version traceability
+- Devcontainer integration - host palace mount shared across environments
+- Safe ChromaDB `0.6.x` ↔ `1.x` reconstruction tooling - non-destructive and runtime-validated
+- Reusable across environments with a shared palace
+
+> **Compatibility status**
+> This bridge currently targets the tested ChromaDB `0.6.x` line (`chromadb>=0.6,<0.7`).
+> This is intentional: newer ChromaDB `1.x` releases can break older MemPalace palaces.
+> If you already rely on existing palaces, this repo prioritizes stability over latest-package tracking.
+> `main` fails fast when the installed `chromadb` version is outside that supported line.
 
 This repository handles the **runtime and setup layer for VS Code Copilot Chat MCP integration**. For structured memory methodology, see [Memory Engineering](#memory-engineering).
 
