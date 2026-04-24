@@ -7,11 +7,11 @@ Bridge to run [MemPalace](https://github.com/milla-jovovich/mempalace) as an MCP
 ## What this is
 
 - a reproducible MemPalace environment (`setup.sh`, `update.sh`, `verify.sh`)
-- MCP server auto-start configuration for VS Code / Copilot Chat
+- MCP server auto-start configuration for VS Code Copilot Chat
 - devcontainer integration (host palace mount, shared across environments)
 - safe ChromaDB 0.6.x ↔ 1.x reconstruction tooling (non-destructive, runtime-validated)
 
-This repository handles the **runtime and setup layer**. For structured memory methodology, see [Memory Engineering](#memory-engineering).
+This repository handles the **runtime and setup layer for VS Code Copilot Chat MCP integration**. For structured memory methodology, see [Memory Engineering](#memory-engineering).
 
 ---
 
