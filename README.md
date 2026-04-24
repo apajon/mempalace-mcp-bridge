@@ -149,8 +149,8 @@ Then ask Copilot about anything in those files.
 
 - This bridge currently targets ChromaDB `0.6.x`, not ChromaDB `1.x`
 - `main` hard-fails outside the supported `chromadb>=0.6,<0.7` range
-- No migration to ChromaDB `1.x` is provided in the stable bridge workflow
-- Experimental ChromaDB `1.x` reconstruction tooling exists, but it is separate from the supported `main` bridge path
+- No migration to ChromaDB `1.x` is provided in the stable bridge workflow; non-`0.6.x` palaces are blocked at startup
+- Experimental ChromaDB `1.x` investigation and reconstruction work exists outside this project's stable contract and is not part of the supported bridge workflow
 - Linux / WSL2 is the tested path today
 - Copilot behavior remains probabilistic even with MemPalace as the preferred context source
 
