@@ -22,6 +22,8 @@ This repo provides a plug-and-play bridge:
 - Palace safety checks — setup, update, verify, and runtime startup reject unsupported `chromadb` versions and keep the bridge on the supported `0.6.x` line
 - Palace format safety gate — risky stable-path operations refuse palaces detected as `chroma_1_x` or `unknown`
 - Palace manifest — setup writes `mempalace-bridge-manifest.json` into the palace root for version traceability
+- Devcontainer integration — host palace mount shared across environments
+- Safe ChromaDB `0.6.x` ↔ `1.x` reconstruction tooling — non-destructive and runtime-validated
 - Reusable across environments with a shared palace
 
 > **Compatibility status**
@@ -30,11 +32,7 @@ This repo provides a plug-and-play bridge:
 > Palaces detected as `chroma_1_x` or `unknown` format are also rejected before any operation.
 > `main` fails fast when the installed `chromadb` version is outside the `0.6.x` range.
 
----
-
-## Install
-
-Download the latest release: https://github.com/apajon/mempalace-mcp-bridge/releases
+This repository handles the **runtime and setup layer for VS Code Copilot Chat MCP integration**. For structured memory methodology, see [Memory Engineering](#memory-engineering).
 
 ---
 
@@ -56,34 +54,73 @@ This repo is for you if:
 git clone https://github.com/apajon/mempalace-mcp-bridge.git
 cd mempalace-mcp-bridge
 
-# 2. Setup everything (installs uv, MemPalace, mines sample data, writes .mcp.json)
+# 2. Setup (installs uv, mempalace, creates .venv, configures .mcp.json)
 bash setup.sh
 
 # 3. Open this folder in VS Code
 
 code .
+
+# 4. Verify
+bash verify.sh
 ```
 
 > **Important:** open the repository root folder in VS Code (`code .` from inside `mempalace-mcp-bridge/`). Opening a subfolder will prevent MCP from loading.
 
-Optionally verify the generated setup before opening Copilot Chat:
+Then reload VS Code (`Ctrl+Shift+P` → **Developer: Reload Window**) if needed.
+
+---
+
+## MCP Configuration
+
+The setup script generates `.mcp.json` automatically. To configure manually, create `.mcp.json` in your workspace:
+
+```json
+{
+  "mcpServers": {
+    "mempalace": {
+      "type": "stdio",
+      "command": "/ABSOLUTE/PATH/TO/uv",
+      "args": ["run", "--directory", "/ABSOLUTE/PATH/TO/mempalace-mcp-bridge", "python", "scripts/run_mcp_server.py"]
+    }
+  }
+}
+```
+
+Replace paths with the output of `which uv` and the absolute path to this repo.
+A ready-to-copy example is at [`examples/mcp/vscode.mcp.json`](examples/mcp/vscode.mcp.json).
+
+See [docs/mcp_vscode.md](docs/mcp_vscode.md) for full details and troubleshooting.
+
+---
+
+## Update
+
+```bash
+git pull
+bash update.sh
+```
+
+`update.sh` upgrades MemPalace, enforces the pinned ChromaDB line, checks `.mcp.json` paths, and runs `verify.sh`. It never touches `~/.mempalace/palace`.
+
+See [docs/update_workflow.md](docs/update_workflow.md) for edge cases and what the script does step by step.
+
+---
+
+## Verify
 
 ```bash
 bash verify.sh
 ```
 
-`verify.sh` is intentionally narrow. It checks the pinned Python/Chroma environment, the installed MemPalace version, `.mcp.json` integrity, real MCP startup, palace readability, and whether the palace manifest still matches the active environment. The summary is one of:
-
-- **SUPPORTED and healthy** — all checks passed
-- **SUPPORTED but suspicious** — the bridge still works, but drift was detected and should be reviewed
-- **UNSUPPORTED or unsafe** — do not rely on the bridge until the failures are fixed
+Checks that the virtual environment, MemPalace, and MCP server are all healthy. Reports actionable errors if anything is broken.
 
 ---
 
 ## Test it in Copilot
 
-```bash
-# Open Copilot Chat and try:
+```text
+Open Copilot Chat and try:
 
 "Remember that I like Python."
 
@@ -93,10 +130,6 @@ Restart VS Code, then ask:
 ```
 
 VS Code auto-starts the MemPalace MCP server when Copilot Chat opens.
-
-
-
-Setup is complete. Advanced usage is optional.
 
 ---
 
@@ -123,6 +156,20 @@ Then ask Copilot about anything in those files.
 
 ---
 
+## Devcontainer integration
+
+For teams using VS Code devcontainers, the palace is mounted from the host so it persists across container rebuilds.
+
+See [docs/devcontainer_integration.md](docs/devcontainer_integration.md) for the mount design and `.devcontainer` config.
+
+---
+
+## Troubleshooting
+
+See [docs/troubleshooting.md](docs/troubleshooting.md).
+
+---
+
 ## Why this exists
 
 MemPalace is powerful, but not plug-and-play in real workflows.
@@ -131,23 +178,23 @@ Setting it up requires multiple manual steps and breaks the flow of using Copilo
 
 That friction stops most users before they get any value.
 
-This repo removes that friction. Setup takes about 2 minutes.
+This repo removes that friction.
 
 ---
 
 ## How it fits together
 
-```
+```text
 VsCode Copilot Chat
-     │
-     ▼
-MCP Server  ← launched automatically by Copilot via .mcp.json
-     │
-     ▼
+  |
+  v
+MCP Server  <- launched automatically by Copilot via .mcp.json
+  |
+  v
 MemPalace
-     │
-     ▼
-Local Memory (palace)  ← ~/.mempalace/palace
+  |
+  v
+Local Memory (palace)  <- ~/.mempalace/palace
 ```
 
 `setup.sh` generates `.mcp.json` with the absolute path to your `uv` binary, so Copilot can start the server without any manual configuration.
@@ -162,53 +209,68 @@ The same setup step writes `mempalace-bridge-manifest.json` into the palace root
 
 ---
 
-## Beyond setup — structured memory (optional)
+## Memory Engineering
 
-The setup alone is already useful. But MemPalace works significantly better when memory is structured.
+Advanced structured memory patterns — wings, rooms, retrieval order, persistence rules, deduplication — now live in a dedicated repository:
 
-This repo includes patterns for:
+**[mempalace-memory-engineering](https://github.com/apajon/mempalace-memory-engineering)**
 
-- **Separating project vs. shared knowledge** — avoid polluting general knowledge with project-specific rules
-- **Avoiding duplication and drift** — mine once, query from any environment
-- **Consistent context across sessions** — decisions persist and remain retrievable
+This includes:
+- structured memory strategy for engineering workflows
+- worked examples (two-wing / three-room setup)
+- semantic deduplication reference
 
-→ See [docs/advanced_memory_strategy.md](docs/advanced_memory_strategy.md) for the full approach.
-
----
-
-## Compatibility
-
-- Linux (tested on Ubuntu 24.04 via WSL2)
-- VS Code with [GitHub Copilot Chat](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot-chat)
-- `curl` required (`setup.sh` uses it to install `uv`)
-- ChromaDB `0.6.x` line pinned intentionally via `chromadb>=0.6,<0.7`
-
-`setup.sh` installs `uv` and Python 3.12 automatically.
+This repository focuses solely on MCP bridge setup and runtime integration. The methodology is not duplicated here.
 
 ---
 
-## Copilot context guidance
+## Documentation
 
-Copilot is configured to use MemPalace as its primary context source via `.github/copilot-instructions.md`.
+### Setup & runtime
 
-Query order: MemPalace project wing → shared wings → `docs/architecture.md` → `README.md` → workspace search.
+* Installation: [docs/installation.md](docs/installation.md)
+* MCP / VS Code config: [docs/mcp_vscode.md](docs/mcp_vscode.md)
+* Update workflow: [docs/update_workflow.md](docs/update_workflow.md)
+* Devcontainer integration: [docs/devcontainer_integration.md](docs/devcontainer_integration.md)
+* Troubleshooting: [docs/troubleshooting.md](docs/troubleshooting.md)
 
-This improves first-response relevance. It is not a strict guarantee — Copilot behavior is probabilistic.
+### Architecture & internals
+
+* Architecture overview: [docs/architecture.md](docs/architecture.md)
+* Error model: [docs/error_model.md](docs/error_model.md)
+* Support matrix: [docs/support_matrix.md](docs/support_matrix.md)
+* Limitations: [docs/limitations.md](docs/limitations.md)
+
+### ChromaDB reconstruction (0.6.x → 1.x)
+
+* CLI usage: [docs/cli_usage.md](docs/cli_usage.md)
+* Palace format detection: [docs/palace_format_detection.md](docs/palace_format_detection.md)
+* Reconstruction workflow: [docs/chromadb_reconstruction_workflow.md](docs/chromadb_reconstruction_workflow.md)
+* Migration guide: [docs/chromadb_reconstruction_migration.md](docs/chromadb_reconstruction_migration.md)
+
+### Compatibility
+
+* Linux (tested on Ubuntu 24.04 via WSL2)
+* VS Code with [GitHub Copilot Chat](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot-chat)
+* `curl` required (`setup.sh` uses it to install `uv`)
+* ChromaDB `0.6.x` line pinned intentionally via `chromadb>=0.6,<0.7`
+
+### Copilot context guidance
+
+* Copilot is configured to use MemPalace as its primary context source via `.github/copilot-instructions.md`
+* Query order: MemPalace project wing -> shared wings -> `docs/architecture.md` -> `README.md` -> workspace search
+* This improves first-response relevance. It is not a strict guarantee - Copilot behavior is probabilistic
+
+### Memory Engineering (external)
+
+* Strategy, examples, deduplication: [mempalace-memory-engineering](https://github.com/apajon/mempalace-memory-engineering)
 
 ---
 
-## Docs
+## Related
 
-If you want to go deeper:
+* MemPalace: [https://github.com/milla-jovovich/mempalace](https://github.com/milla-jovovich/mempalace)
+* ChromaDB: [https://github.com/chroma-core/chroma](https://github.com/chroma-core/chroma)
+* Memory Engineering: [https://github.com/apajon/mempalace-memory-engineering](https://github.com/apajon/mempalace-memory-engineering)
 
-| Topic | Link |
-|-------|------|
-| Architecture overview | [docs/architecture.md](docs/architecture.md) |
-| MCP config and VS Code integration | [docs/mcp_vscode.md](docs/mcp_vscode.md) |
-| Palace format detection | [docs/palace_format_detection.md](docs/palace_format_detection.md) |
-| Devcontainer integration | [docs/devcontainer_integration.md](docs/devcontainer_integration.md) |
-| Update and verify workflow | [docs/update_workflow.md](docs/update_workflow.md) |
-| Troubleshooting | [docs/troubleshooting.md](docs/troubleshooting.md) |
-| Structured memory example | [docs/memory_example.md](docs/memory_example.md) |
-| Advanced memory strategy | [docs/advanced_memory_strategy.md](docs/advanced_memory_strategy.md) |
-| MemPalace project | [github.com/milla-jovovich/mempalace](https://github.com/milla-jovovich/mempalace) |
+---
