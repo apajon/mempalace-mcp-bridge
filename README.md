@@ -1,6 +1,6 @@
-# MemPalace MCP Bridge
+# MemPalace MCP Bridge for VS Code Copilot
 
-Bridge to run [MemPalace](https://github.com/milla-jovovich/mempalace) as an MCP server for VS Code Copilot Chat.
+Give [MemPalace](https://github.com/milla-jovovich/mempalace) a persistent local memory inside VS Code Copilot Chat.
 
 ---
 
