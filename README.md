@@ -100,6 +100,17 @@ Checks that the virtual environment, MemPalace, and MCP server are all healthy. 
 
 ---
 
+## Known limitations
+
+- This bridge currently targets ChromaDB `0.6.x`, not ChromaDB `1.x`
+- `main` hard-fails outside the supported `chromadb>=0.6,<0.7` range
+- No migration to ChromaDB `1.x` is provided in the stable bridge workflow
+- Experimental ChromaDB `1.x` reconstruction tooling exists, but it is separate from the supported `main` bridge path
+- Linux / WSL2 is the tested path today
+- Copilot behavior remains probabilistic even with MemPalace as the preferred context source
+
+---
+
 ## Devcontainer integration
 
 For teams using VS Code devcontainers, the palace is mounted from the host so it persists across container rebuilds.
