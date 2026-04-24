@@ -15,22 +15,22 @@ This repo provides a plug-and-play bridge:
 ## What you get
 
 - Persistent memory inside Copilot Chat
-- Fully local - no cloud, no API key, no Docker
-- Auto-start - no terminal, VS Code handles everything
-- Mine your own files - query your notes, docs, and decisions
-- Built-in verification - `verify.sh` classifies the bridge as healthy, suspicious, or unsafe by checking the environment, the generated MCP config, real MCP startup, and palace manifest drift
-- Palace safety checks - setup, update, verify, and runtime startup reject unsupported `chromadb` versions and keep the bridge on the tested `0.6.x` line
-- Palace format safety gate - risky stable-path operations refuse palaces detected as `chroma_1_x` or `unknown`
-- Palace manifest - setup writes `mempalace-bridge-manifest.json` into the palace root for version traceability
-- Devcontainer integration - host palace mount shared across environments
-- Safe ChromaDB `0.6.x` ↔ `1.x` reconstruction tooling - non-destructive and runtime-validated
+- Fully local — no cloud, no API key, no Docker
+- Auto-start — no terminal, VS Code handles everything
+- Mine your own files — query your notes, docs, and decisions
+- Built-in verification — `verify.sh` classifies the bridge as healthy, suspicious, or unsafe by checking the environment, the generated MCP config, real MCP startup, and palace manifest drift
+- Palace safety checks — setup, update, verify, and runtime startup reject unsupported `chromadb` versions and keep the bridge on the supported `0.6.x` line
+- Palace format safety gate — risky stable-path operations refuse palaces detected as `chroma_1_x` or `unknown`
+- Palace manifest — setup writes `mempalace-bridge-manifest.json` into the palace root for version traceability
+- Devcontainer integration — host palace mount shared across environments
+- Safe ChromaDB `0.6.x` ↔ `1.x` reconstruction tooling — non-destructive and runtime-validated
 - Reusable across environments with a shared palace
 
 > **Compatibility status**
-> This bridge currently targets the tested ChromaDB `0.6.x` line (`chromadb>=0.6,<0.7`).
-> This is intentional: newer ChromaDB `1.x` releases can break older MemPalace palaces.
-> If you already rely on existing palaces, this repo prioritizes stability over latest-package tracking.
-> `main` fails fast when the installed `chromadb` version is outside that supported line.
+> This bridge targets ChromaDB `0.6.x` only (`chromadb>=0.6,<0.7`).
+> ChromaDB `1.x` uses an incompatible storage format; non-`0.6.x` installs are rejected at startup.
+> Palaces detected as `chroma_1_x` or `unknown` format are also rejected before any operation.
+> `main` fails fast when the installed `chromadb` version is outside the `0.6.x` range.
 
 This repository handles the **runtime and setup layer for VS Code Copilot Chat MCP integration**. For structured memory methodology, see [Memory Engineering](#memory-engineering).
 
