@@ -73,7 +73,7 @@ import json
 try:
     with open('$MCP_CONFIG') as f:
         cfg = json.load(f)
-    args = cfg['mcpServers']['mempalace'].get('args', [])
+    args = cfg['servers']['mempalace'].get('args', [])
     idx = args.index('--directory') if '--directory' in args else -1
     print(args[idx + 1] if idx >= 0 else '')
 except Exception:
@@ -84,7 +84,7 @@ import json
 try:
     with open('$MCP_CONFIG') as f:
         cfg = json.load(f)
-    print(cfg['mcpServers']['mempalace'].get('command', ''))
+    print(cfg['servers']['mempalace'].get('command', ''))
 except Exception:
     print('')
 " 2>/dev/null || true)
@@ -93,7 +93,7 @@ import json
 try:
     with open('$MCP_CONFIG') as f:
         cfg = json.load(f)
-    print(json.dumps(cfg['mcpServers']['mempalace'].get('args', [])))
+    print(json.dumps(cfg['servers']['mempalace'].get('args', [])))
 except Exception:
     print('')
 " 2>/dev/null || true)
@@ -106,7 +106,7 @@ fi
 if [ "$_needs_regen" = true ]; then
     cat > "$MCP_CONFIG" <<EOF
 {
-  "mcpServers": {
+  "servers": {
     "mempalace": {
       "type": "stdio",
       "command": "$UV_PATH",
