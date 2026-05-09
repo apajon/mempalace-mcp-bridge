@@ -1,6 +1,6 @@
 {
   "_note": "This is a template. setup.sh generates the real .mcp.json with correct absolute paths automatically.",
-  "mcpServers": {
+  "servers": {
     "mempalace": {
       "type": "stdio",
       "command": "/ABSOLUTE/PATH/TO/uv",
