@@ -57,79 +57,9 @@ bash "$REPO_ROOT/scripts/mine_sample_data.sh"
 
 info "Step 4/4 — Generating workspace MCP config..."
 
-UV_PATH="$(command -v uv 2>/dev/null || true)"
-if [ -z "$UV_PATH" ]; then
-    # Try common install locations after bootstrap
-    for candidate in "$HOME/.cargo/bin/uv" "$HOME/.local/bin/uv"; do
-        if [ -x "$candidate" ]; then
-            UV_PATH="$candidate"
-            break
-        fi
-    done
-fi
-[ -n "$UV_PATH" ] || fail "uv not found after bootstrap — cannot write MCP config."
-
-MCP_CONFIG="$REPO_ROOT/.mcp.json"
-
-# Only regenerate if the config is missing, has placeholder paths, or the
-# stored paths no longer match this machine (e.g. repo moved, uv reinstalled).
-_needs_regen=true
-if [ -f "$MCP_CONFIG" ] && ! grep -q "ABSOLUTE/PATH" "$MCP_CONFIG" 2>/dev/null; then
-    VENV_PYTHON="$REPO_ROOT/.venv/bin/python"
-    EXPECTED_ARGS_JSON='["run", "--directory", "'"$CANONICAL_LINK"'", "python", "scripts/run_mcp_server.py"]'
-    _stored_dir=$("$VENV_PYTHON" -c "
-import json
-try:
-    with open('$MCP_CONFIG') as f:
-        cfg = json.load(f)
-    args = cfg['servers']['mempalace'].get('args', [])
-    idx = args.index('--directory') if '--directory' in args else -1
-    print(args[idx + 1] if idx >= 0 else '')
-except Exception:
-    print('')
-" 2>/dev/null || true)
-    _stored_uv=$("$VENV_PYTHON" -c "
-import json
-try:
-    with open('$MCP_CONFIG') as f:
-        cfg = json.load(f)
-    print(cfg['servers']['mempalace'].get('command', ''))
-except Exception:
-    print('')
-" 2>/dev/null || true)
-    _stored_args=$("$VENV_PYTHON" -c "
-import json
-try:
-    with open('$MCP_CONFIG') as f:
-        cfg = json.load(f)
-    print(json.dumps(cfg['servers']['mempalace'].get('args', [])))
-except Exception:
-    print('')
-" 2>/dev/null || true)
-
-    if [ "$_stored_dir" = "$CANONICAL_LINK" ] && [ "$_stored_uv" = "$UV_PATH" ] && [ "$_stored_args" = "$EXPECTED_ARGS_JSON" ]; then
-        _needs_regen=false
-    fi
-fi
-
-if [ "$_needs_regen" = true ]; then
-    cat > "$MCP_CONFIG" <<EOF
-{
-  "servers": {
-    "mempalace": {
-      "type": "stdio",
-      "command": "$UV_PATH",
-      "args": ["run", "--directory", "$CANONICAL_LINK", "python", "scripts/run_mcp_server.py"]
-    }
-  }
-}
-EOF
-    # --directory points at the canonical symlink, so uv resolves the same
-    # project root (and .venv) regardless of where VS Code launches the server.
-    ok "MCP config written to $MCP_CONFIG"
-else
-    ok "MCP config already up to date — not modified ($MCP_CONFIG)"
-fi
+# Owns .mcp.json generation/repair (canonical --directory) and removes the
+# obsolete .vscode/mcp.json. See scripts/mcp_config.sh.
+bash "$REPO_ROOT/scripts/mcp_config.sh" --ensure
 
 # ─── Done ─────────────────────────────────────────────────────────────────────
 

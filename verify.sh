@@ -265,7 +265,8 @@ if [ ! -f "$MCP_CONFIG" ]; then
     fail "Workspace MCP config missing at $MCP_CONFIG"
     detail "Run: bash setup.sh"
     if [ -f "$LEGACY_MCP_CONFIG" ]; then
-        detail "Or migrate the legacy config: jq '{servers: .servers}' .vscode/mcp.json > .mcp.json"
+        detail "setup.sh will consolidate the legacy .vscode/mcp.json into .mcp.json"
+        detail "with the canonical bridge path ($CANONICAL_LINK)."
     fi
 elif grep -q "ABSOLUTE/PATH" "$MCP_CONFIG" 2>/dev/null; then
     fail "Workspace MCP config still contains placeholder paths"

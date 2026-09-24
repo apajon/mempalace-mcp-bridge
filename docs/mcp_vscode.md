@@ -41,11 +41,15 @@ which uv
 
 A ready-to-copy example is at `examples/mcp/vscode.mcp.json`.
 
-If you have an older `.vscode/mcp.json`, migrate it with:
+If you have an older `.vscode/mcp.json`, just run:
 
 ```bash
-jq '{servers: .servers}' .vscode/mcp.json > .mcp.json
+bash setup.sh   # or: bash update.sh
 ```
+
+`setup.sh` / `update.sh` consolidate it into `.mcp.json` (pointing `--directory`
+at the canonical bridge path `$HOME/.local/share/mempalace-mcp-bridge`) and then
+remove the obsolete `.vscode/mcp.json` so its stale clone path is never picked up.
 
 > **Why absolute path?** MCP clients often launch processes in a limited environment where `$PATH` may not include your shell's customizations. Using an absolute path avoids "command not found" errors.
 

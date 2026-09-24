@@ -199,11 +199,15 @@ Local Memory (palace)  <- ~/.mempalace/palace
 
 `setup.sh` generates `.mcp.json` with the absolute path to your `uv` binary, so Copilot can start the server without any manual configuration.
 
-If you already have a legacy `.vscode/mcp.json`, migrate it with:
+If you already have a legacy `.vscode/mcp.json`, just run:
 
 ```bash
-jq '{servers: .servers}' .vscode/mcp.json > .mcp.json
+bash setup.sh   # or: bash update.sh
 ```
+
+`setup.sh` / `update.sh` consolidate it into `.mcp.json` (pointing `--directory`
+at the canonical bridge path `$HOME/.local/share/mempalace-mcp-bridge`) and then
+remove the obsolete `.vscode/mcp.json` so its stale clone path is never picked up.
 
 The same setup step writes `mempalace-bridge-manifest.json` into the palace root. The file is intentionally small and easy to inspect manually: it records the bridge version, MemPalace version, ChromaDB version, Python version, storage backend and format, the supported compatibility line, and the creation timestamp. If a valid manifest already exists, setup preserves it. If the file exists but is malformed, setup replaces it with a fresh valid manifest.
 
