@@ -14,7 +14,8 @@
 #
 # Responsibilities:
 #   - generate .mcp.json when it is missing
-#   - repair .mcp.json when the stored uv command or --directory path is stale
+#   - repair only servers.mempalace when its uv command or --directory path is
+#     stale, preserving every other server and top-level key
 #   - remove the obsolete .vscode/mcp.json so its stale physical path can never
 #     be picked up alongside .mcp.json
 #
@@ -73,69 +74,114 @@ resolve_json_python() {
 
 JSON_PYTHON="$(resolve_json_python)"
 
-# Exit 0 when .mcp.json already embeds the canonical bridge path and the
-# current uv command; non-zero otherwise.
-config_is_current() {
+# Updates only .servers.mempalace in .mcp.json, preserving every other
+# top-level key and every unrelated server. The read-modify-write happens in
+# Python so unrelated content survives untouched, and the file is written
+# atomically (temp file + rename) only when the mempalace entry actually needs
+# to change.
+#
+# Prints exactly one token on stdout:
+#   current  -> .mcp.json already correct, nothing written
+#   created  -> .mcp.json did not exist, created with servers.mempalace
+#   updated  -> only servers.mempalace was inserted/replaced, all else preserved
+#   invalid  -> .mcp.json exists but is not valid JSON, left untouched (error)
+update_config() {
     local uv_path="$1"
-    [ -f "$MCP_CONFIG" ] || return 1
-    if grep -q "ABSOLUTE/PATH" "$MCP_CONFIG" 2>/dev/null; then
-        return 1
-    fi
-    "$JSON_PYTHON" - "$MCP_CONFIG" "$uv_path" "$CANONICAL_LINK" >/dev/null 2>&1 <<'PYEOF'
+    "$JSON_PYTHON" - "$MCP_CONFIG" "$uv_path" "$CANONICAL_LINK" <<'PYEOF'
 import json
+import os
 import sys
+import tempfile
 
 cfg_path, uv_path, canonical = sys.argv[1], sys.argv[2], sys.argv[3]
-expected_args = ["run", "--directory", canonical, "python", "scripts/run_mcp_server.py"]
-try:
-    with open(cfg_path, "r", encoding="utf-8") as handle:
-        cfg = json.load(handle)
-    server = cfg.get("servers", {}).get("mempalace")
-    if not isinstance(server, dict):
-        raise SystemExit(1)
-    ok = (
-        server.get("type") == "stdio"
-        and server.get("command") == uv_path
-        and server.get("args") == expected_args
-    )
-    raise SystemExit(0 if ok else 1)
-except Exception:
-    raise SystemExit(1)
-PYEOF
+
+expected_entry = {
+    "type": "stdio",
+    "command": uv_path,
+    "args": ["run", "--directory", canonical, "python", "scripts/run_mcp_server.py"],
 }
 
-generate_config() {
-    local uv_path="$1"
-    cat > "$MCP_CONFIG" <<EOF
-{
-  "servers": {
-    "mempalace": {
-      "type": "stdio",
-      "command": "$uv_path",
-      "args": ["run", "--directory", "$CANONICAL_LINK", "python", "scripts/run_mcp_server.py"]
-    }
-  }
-}
-EOF
+created = not os.path.exists(cfg_path)
+
+if created:
+    cfg = {}
+else:
+    try:
+        with open(cfg_path, "r", encoding="utf-8") as handle:
+            raw = handle.read()
+    except OSError:
+        print("invalid")
+        raise SystemExit(1)
+
+    if not raw.strip():
+        cfg = {}
+    else:
+        try:
+            cfg = json.loads(raw)
+        except Exception:
+            print("invalid")
+            raise SystemExit(1)
+
+if not isinstance(cfg, dict):
+    cfg = {}
+
+servers = cfg.get("servers")
+if not isinstance(servers, dict):
+    servers = {}
+    cfg["servers"] = servers
+
+# Only the mempalace entry is owned; everything else is preserved verbatim.
+if not created and servers.get("mempalace") == expected_entry:
+    print("current")
+    raise SystemExit(0)
+
+servers["mempalace"] = expected_entry
+
+# Preserve the original file mode when present, defaulting to 0o644.
+mode = None
+if not created:
+    try:
+        mode = os.stat(cfg_path).st_mode & 0o777
+    except OSError:
+        mode = None
+
+parent = os.path.dirname(os.path.abspath(cfg_path)) or "."
+fd, tmp_path = tempfile.mkstemp(dir=parent, prefix=".mcp.json.", suffix=".tmp")
+try:
+    with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        json.dump(cfg, handle, indent=2)
+        handle.write("\n")
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.chmod(tmp_path, mode if mode is not None else 0o644)
+    os.replace(tmp_path, cfg_path)
+finally:
+    try:
+        os.remove(tmp_path)
+    except OSError:
+        pass
+
+print("created" if created else "updated")
+PYEOF
 }
 
 ensure_config() {
     local uv_path
     uv_path="$(resolve_uv_path)" || fail "uv not found — cannot write MCP config."
 
-    if [ -f "$MCP_CONFIG" ] && config_is_current "$uv_path"; then
-        ok "MCP config already up to date — not modified ($MCP_CONFIG)"
-    else
-        if [ -f "$MCP_CONFIG" ]; then
-            info "MCP config is stale (wrong uv command or --directory) — regenerating."
-        elif [ -f "$LEGACY_MCP_CONFIG" ]; then
-            info "Legacy MCP config found at .vscode/mcp.json — consolidating into .mcp.json."
-        else
-            info "MCP config not found — generating."
-        fi
-        generate_config "$uv_path"
-        ok "MCP config written to $MCP_CONFIG (--directory $CANONICAL_LINK)"
+    local result
+    if ! result="$(update_config "$uv_path" 2>&1)"; then
+        echo "[ERROR] Could not update MCP config (left untouched):" >&2
+        echo "$result" >&2
+        exit 1
     fi
+
+    case "$result" in
+        current) ok "MCP config already up to date — not modified ($MCP_CONFIG)" ;;
+        created) ok "MCP config written to $MCP_CONFIG (--directory $CANONICAL_LINK)" ;;
+        updated) ok "MCP config repaired — only servers.mempalace updated ($MCP_CONFIG)" ;;
+        *) warn "$result" ;;
+    esac
 
     # The legacy .vscode/mcp.json is obsolete now that .mcp.json is the source of
     # truth. Remove it so its stale physical clone path can never be picked up.
