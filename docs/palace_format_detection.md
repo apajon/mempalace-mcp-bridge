@@ -76,23 +76,123 @@ Guarded flows:
 - `scripts/init_palace.sh`
 - `scripts/mine_sample_data.sh`
 - `scripts/check_palace_health.sh`
+- `scripts/palace_legacy_repair.py` (the only repair path)
 - `scripts/run_mcp_server.py`
 - `verify.sh` (before palace health/open checks)
 
 Policy on the stable path:
 
-- `chroma_0_6` → allowed
+- `chroma_0_6` → allowed for every action
 - `chroma_1_x` → blocked
-- `unknown` → blocked
+- `unknown` → blocked for **read** and **write**
+- `unknown` + `repair` → allowed **only** when the narrow legacy repair preflight
+  passes (see below)
 
 Examples:
 
 ```bash
 python3 scripts/palace_safety_gate.py --action read ~/.mempalace/palace
 python3 scripts/palace_safety_gate.py --action write ~/.mempalace/palace
+python3 scripts/palace_safety_gate.py --action repair ~/.mempalace/palace
 ```
 
-The gate does not migrate, repair, or retry with another runtime. It only decides whether the stable bridge should proceed.
+The gate does not migrate or retry with another runtime. It only decides whether
+the stable bridge should proceed.
+
+## Three distinct notions
+
+These must never be conflated:
+
+| Notion | Question it answers | Where |
+|---|---|---|
+| **Runtime compatibility** (`chroma_0_6` / `chroma_1_x` / `unknown`) | may the pinned 0.6.x bridge open this palace at all? | `palace_format_detector.py` |
+| **Storage profile** (`chroma_0_6_native` / `chroma_1_x_migrated` / `unknown`) | *what actually wrote the SQLite schema?* | `palace_legacy_repair.detect_storage_profile()` |
+| **Repair eligibility** (eligible / not) | may this untyped palace be repaired, and under which profile? | `palace_legacy_repair.evaluate_legacy_repair_eligibility()` |
+
+A palace can be *structurally ambiguous as a format* while being *eligible for a
+known legacy migration*. Conversely, a palace can be *runtime-compatible* without
+being a 0.6.x-native schema.
+
+> `chroma_0_6` is a **runtime-compatibility** verdict, not a provenance claim.
+> A palace whose schema was written by ChromaDB 1.x and then reopened by 0.6.x is
+> classified `chroma_0_6` (0.6.3 can read it — its `SqlDB.decode_seq_id` accepts
+> `int`, and 0.6.3 names its columns explicitly so the extra 1.x tables/columns are
+> ignored), while its **storage profile** is `chroma_1_x_migrated`. The manifest
+> records both, so no false provenance is stored.
+
+## Storage profiles
+
+| Profile | Migrations | `seq_id` stored | `schema_str` | `acquire_write`, `embedding_metadata_array` |
+|---|---|---|---|---|
+| `chroma_0_6_native` | `sysdb 9`, `metadb 4`, `embeddings_queue 2` | blob | absent | absent |
+| `chroma_1_x_migrated` | `sysdb 10`, `metadb 6`, `embeddings_queue 2` | integer | present | present |
+
+Both profiles are matched **exactly**; a palace that matches neither (including a
+half-migrated one — e.g. integer `seq_id` with 0.6.x migrations) is reported as
+`unknown` and is never repaired.
+
+## Narrow legacy repair
+
+Detecting `unknown` is not the same as "must never be repaired". A legacy palace
+that stored an untyped `config_json_str` of `{}` is safely repairable into the
+typed configuration. That possibility is handled by a **separate, much stricter**
+preflight in `scripts/palace_legacy_repair.py`, which is the only thing that can
+authorise a `repair` on an `unknown` palace.
+
+Eligibility requires **all** of these:
+
+| Invariant | Check |
+|---|---|
+| Not another storage line | detection is not `chroma_1_x` |
+| Database present | `chroma.sqlite3` exists |
+| Manifest not contradictory | no manifest, or a manifest confirming the `chromadb-0.6.x` compatibility line |
+| SQLite opens read-only | the database is readable |
+| SQLite integrity | `PRAGMA integrity_check` returns `ok` |
+| Config value | every `config_json_str` is exactly `{}` — **not** `NULL`, not `''`, not mixed with typed values, not non-empty untyped, not invalid JSON |
+| Known storage profile | the schema matches `chroma_0_6_native` **or** `chroma_1_x_migrated` exactly |
+| Expected collection | the configured MemPalace collection is present |
+
+The profile then adds its own structural checks (migrations, table set, extra
+tables, `collections` columns, real `typeof(seq_id)`, no leftover `int_seq_id`,
+`embedding_metadata.bool_value`).
+
+Any single failure makes the palace ineligible and nothing is mutated. This is
+deliberately fail-closed.
+
+> **`NULL` is deliberately not repairable.** ChromaDB 0.6.x opens a `NULL`
+> configuration without error (verified), so such a palace needs no mutation and
+> is left untouched. An empty string is a different failure shape and is also
+> refused rather than guessed at.
+
+When the palace is eligible, the repair:
+
+1. creates a consistent backup via the SQLite backup API, named
+   `chroma.sqlite3.bak-<UTC timestamp>` (an existing backup is never overwritten);
+2. rewrites the untyped `config_json_str` values inside a single transaction
+   (rollback on any error);
+3. re-detects the palace and opens it through the real stack as a smoke test;
+4. if post-repair validation fails, restores the backup;
+5. only after a successful repair **and** a successful read does it write
+   `mempalace-bridge-manifest.json` (and only when no valid manifest already
+   exists), recording the detected **storage profile** alongside the runtime
+   compatibility line.
+
+The manifest is never marked as compatible before the repair and the smoke test
+have both succeeded, and it never records a storage profile that was not actually
+observed.
+
+Inspect the profile without touching anything:
+
+```bash
+.venv/bin/python scripts/palace_legacy_repair.py ~/.mempalace/palace --detect-profile
+```
+
+Run the preflight manually with:
+
+```bash
+.venv/bin/python scripts/palace_legacy_repair.py ~/.mempalace/palace          # preflight only
+.venv/bin/python scripts/palace_legacy_repair.py ~/.mempalace/palace --apply  # apply
+```
 
 ## Example outputs
 

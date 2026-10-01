@@ -4,13 +4,22 @@
 #
 # Background: ChromaDB >= 0.6.0 requires a _type field in config_json_str.
 # Palaces created with older versions store '{}' and fail with "No palace found".
-# This script can either report the problem or, in repair mode, back up the SQLite
-# file and apply the fix in-place.
+#
+# This script is a thin, policy-enforcing wrapper:
+#   1. it asks the safety gate whether the requested action is authorised
+#      (read-only -> "read", repair -> "repair");
+#   2. it delegates the actual check/repair to scripts/palace_legacy_repair.py,
+#      which owns the strict legacy invariants, the non-overwriting SQLite
+#      backup (via the SQLite backup API) and the post-repair smoke test.
+#
+# A legacy palace is only auto-repaired when it matches the narrow legacy
+# contract. Any other unrecognised palace is refused untouched.
 #
 # Exit codes:
 #   0 — palace is healthy (or was successfully repaired)
-#   1 — palace is inaccessible and could not be repaired
-#   2 — palace not found (no SQLite yet — normal after a fresh install)
+#   1 — palace is inaccessible, refused, or could not be repaired
+#   2 — palace not found (no SQLite yet) or not bootstrapped — normal after a
+#       fresh install
 #
 # Callers: setup.sh, update.sh, verify.sh
 
@@ -51,77 +60,24 @@ GATE_OUTPUT=""
 GATE_EXIT=0
 GATE_OUTPUT=$("$VENV_PYTHON" "$REPO_ROOT/scripts/palace_safety_gate.py" --action "$GATE_ACTION" 2>&1) || GATE_EXIT=$?
 if [ "$GATE_EXIT" -ne 0 ]; then
+    # In read-only mode, tell the operator precisely whether this is a
+    # repairable legacy palace or genuinely unsafe storage.
+    if [ "$MODE" = "read-only" ]; then
+        if "$VENV_PYTHON" "$REPO_ROOT/scripts/palace_legacy_repair.py" >/dev/null 2>&1; then
+            fail_msg "Palace is a legacy palace that requires the narrow repair (untyped config)."
+            fail_msg "Run: bash update.sh"
+            fail_msg "Or:  python3 scripts/palace_legacy_repair.py <palace> --apply"
+            exit 1
+        fi
+    fi
     printf '%s\n' "$GATE_OUTPUT" >&2
     exit 1
 fi
 
-RESULT=$(
-PALACE_HEALTH_MODE="$MODE" "$VENV_PYTHON" - 2>/dev/null <<'PYEOF'
-import sys, json, sqlite3, shutil
-import os
-from pathlib import Path
-
-try:
-    from mempalace.config import MempalaceConfig
-    import chromadb
-    from chromadb.api.configuration import CollectionConfigurationInternal
-except ImportError as e:
-    print(f"SKIP:{e}")
-    sys.exit(0)
-
-cfg = MempalaceConfig()
-palace_path = cfg.palace_path
-db_path = Path(palace_path) / "chroma.sqlite3"
-mode = os.environ.get("PALACE_HEALTH_MODE", "repair")
-
-if not db_path.exists():
-    print("NOTFOUND:")
-    sys.exit(0)
-
-# ── Step 1: detect broken config_json_str ────────────────────────────────────
-conn = sqlite3.connect(str(db_path))
-c = conn.cursor()
-try:
-    c.execute("SELECT id, name, config_json_str FROM collections")
-    rows = c.fetchall()
-except Exception as e:
-    print(f"FAIL:{e}")
-    conn.close()
-    sys.exit(1)
-
-broken = [(row[0], row[1]) for row in rows if not json.loads(row[2] or "{}").get("_type")]
-
-if broken:
-    if mode == "read-only":
-        print(f"BROKEN:{','.join(name for _, name in broken)}")
-        conn.close()
-        sys.exit(1)
-
-    # Back up the SQLite before any modification
-    backup_path = str(db_path) + ".bak"
-    shutil.copy2(str(db_path), backup_path)
-    correct = CollectionConfigurationInternal().to_json_str()
-    fixed_names = []
-    for col_id, col_name in broken:
-        c.execute("UPDATE collections SET config_json_str = ? WHERE id = ?", (correct, col_id))
-        fixed_names.append(col_name)
-    conn.commit()
-    conn.close()
-    print(f"FIXED:{','.join(fixed_names)}")
-    sys.exit(0)
-
-conn.close()
-
-# ── Step 2: connectivity test ─────────────────────────────────────────────────
-try:
-    client = chromadb.PersistentClient(path=palace_path)
-    col = client.get_or_create_collection(cfg.collection_name)
-    print(f"OK:{col.count()}")
-except Exception as e:
-    print(f"FAIL:{e}")
-    sys.exit(1)
-PYEOF
-)
+# The gate authorised the operation. Delegate the actual health check / narrow
+# legacy repair to palace_legacy_repair.py, which owns the strict invariants,
+# the non-overwriting SQLite backup and the post-repair smoke test.
+RESULT="$("$VENV_PYTHON" "$REPO_ROOT/scripts/palace_legacy_repair.py" --health "$MODE")" || true
 
 case "$RESULT" in
     OK:*)
@@ -129,18 +85,26 @@ case "$RESULT" in
         exit 0
         ;;
     FIXED:*)
-        NAMES="${RESULT#FIXED:}"
-        warn "ChromaDB config incompatibility detected on collection(s): $NAMES"
-        warn "Auto-repaired. Backup saved as: ~/.mempalace/palace/chroma.sqlite3.bak"
+        FIXED_PAYLOAD="${RESULT#FIXED:}"
+        FIXED_NAMES="${FIXED_PAYLOAD%%|*}"
+        FIXED_BACKUP="${FIXED_PAYLOAD#*|}"
+        warn "ChromaDB legacy config detected on collection(s): $FIXED_NAMES"
+        warn "Narrow legacy repair applied. Backup: ${FIXED_BACKUP:-<not reported>}"
         warn "See docs/troubleshooting.md#chromadb-version-incompatibility for details."
         ok "Palace repaired and accessible"
         exit 0
         ;;
-    BROKEN:*)
-        NAMES="${RESULT#BROKEN:}"
-        fail_msg "Palace has a ChromaDB config incompatibility on collection(s): $NAMES"
+    REPAIRABLE:*)
+        fail_msg "Palace is a legacy palace that requires the narrow repair (untyped config)."
+        fail_msg "Collections: ${RESULT#REPAIRABLE:}"
         fail_msg "Run: bash update.sh"
-        fail_msg "See docs/troubleshooting.md#chromadb-version-incompatibility"
+        fail_msg "Or:  python3 scripts/palace_legacy_repair.py <palace> --apply"
+        exit 1
+        ;;
+    UNKNOWN:*)
+        fail_msg "Palace format is unknown and does not match the narrow legacy repair contract."
+        fail_msg "${RESULT#UNKNOWN:}"
+        fail_msg "Refusing to mutate this palace. Inspect it with: python3 scripts/palace_format_detector.py <palace> --pretty"
         exit 1
         ;;
     NOTFOUND:*)

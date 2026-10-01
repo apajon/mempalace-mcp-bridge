@@ -18,6 +18,7 @@ from palace_format_detector import (
     DetectionEvidence,
     detect_palace_format,
 )
+from palace_legacy_repair import evaluate_legacy_repair_eligibility
 
 Action = Literal["read", "write", "create", "repair"]
 
@@ -65,6 +66,14 @@ def _block_message(action: Action, classification: str, palace_path: Path, detai
     )
 
 
+def _legacy_repair_hint(palace_path: Path) -> str:
+    return (
+        "If this is a legacy palace storing an untyped config_json_str ({}), verify the narrow "
+        f"repair contract with: python3 scripts/palace_legacy_repair.py {palace_path} "
+        f"then apply it with: python3 scripts/palace_legacy_repair.py {palace_path} --apply"
+    )
+
+
 def evaluate_palace_safety(palace_path: str | Path, action: Action) -> SafetyGateResult:
     path = Path(palace_path).expanduser().resolve()
     sqlite_path = path / CHROMA_SQLITE_FILENAME
@@ -97,7 +106,46 @@ def evaluate_palace_safety(palace_path: str | Path, action: Action) -> SafetyGat
             message="Palace format is safe for the stable chroma_0_6 path.",
         )
 
+    # The format is not positively identified. A dedicated `repair` action may
+    # still proceed, but only when the strict narrow legacy preflight passes.
+    # read/write remain blocked: an untyped config alone is not proof.
+    if action == "repair":
+        eligibility = evaluate_legacy_repair_eligibility(path)
+        if eligibility.eligible:
+            return SafetyGateResult(
+                palace_path=detection.palace_path,
+                action=action,
+                allowed=True,
+                classification=detection.classification,
+                confidence="medium",
+                evidence=detection.evidence,
+                message=(
+                    "Palace is not typed, but it matches the narrow legacy repair contract "
+                    "(untyped {}) — the dedicated repair is authorised."
+                ),
+            )
+
+        failed = eligibility.failed_invariants()
+        failed_detail = "; ".join(f"{item.name}: {item.detail}" for item in failed) or "no invariant evidence"
+        return SafetyGateResult(
+            palace_path=detection.palace_path,
+            action=action,
+            allowed=False,
+            classification=detection.classification,
+            confidence=detection.confidence,
+            evidence=detection.evidence,
+            message=(
+                f"Refusing to repair palace at {path}: detected format is {detection.classification} and it "
+                f"does not match the narrow legacy repair contract. {failed_detail}. "
+                f"{_legacy_repair_hint(path)}"
+            ),
+        )
+
     primary_detail = detection.evidence[0].detail if detection.evidence else "No decisive evidence found"
+    message = _block_message(action, detection.classification, path, primary_detail)
+    if detection.classification != CLASS_CHROMA_1_X:
+        message = f"{message}. {_legacy_repair_hint(path)}"
+
     return SafetyGateResult(
         palace_path=detection.palace_path,
         action=action,
@@ -105,7 +153,7 @@ def evaluate_palace_safety(palace_path: str | Path, action: Action) -> SafetyGat
         classification=detection.classification,
         confidence=detection.confidence,
         evidence=detection.evidence,
-        message=_block_message(action, detection.classification, path, primary_detail),
+        message=message,
     )
 
 

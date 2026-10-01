@@ -69,8 +69,47 @@ def get_path_source() -> str:
     return "mempalace-config-or-default"
 
 
-def build_manifest(repo_root: Path) -> dict[str, Any]:
+def detect_palace_storage_profile(palace_path: Path) -> tuple[str, dict[str, int]]:
+    """Best-effort structural storage profile of a palace. Never raises."""
+    try:
+        from palace_legacy_repair import detect_storage_profile
+    except Exception:
+        return "unknown", {}
+    try:
+        result = detect_storage_profile(palace_path)
+    except Exception:
+        return "unknown", {}
+    return result.profile, dict(result.schema_versions)
+
+
+def build_manifest(
+    repo_root: Path,
+    *,
+    storage_profile: str | None = None,
+    schema_versions: dict[str, int] | None = None,
+) -> dict[str, Any]:
+    """Build the palace manifest.
+
+    Two distinct notions are recorded and must not be conflated:
+
+    * ``compatibility_line`` — which runtime line this palace is compatible with
+      (a *runtime* claim; the stable bridge only opens ``chromadb-0.6.x``);
+    * ``storage_profile`` / ``storage_schema_versions`` — what actually wrote the
+      SQLite schema (a *provenance* claim).
+
+    For a palace migrated by ChromaDB 1.x and reopened by 0.6.x, the first is
+    ``chromadb-0.6.x`` and the second is ``chroma_1_x_migrated`` with
+    ``{"sysdb": 10, "metadb": 6, "embeddings_queue": 2}``. Recording only the
+    runtime line would be a false provenance claim.
+    """
     config = MempalaceConfig()
+
+    if storage_profile is None:
+        detected_profile, detected_versions = detect_palace_storage_profile(Path(config.palace_path))
+        storage_profile = detected_profile
+        if schema_versions is None:
+            schema_versions = detected_versions
+
     return {
         "manifest_version": MANIFEST_VERSION,
         "bridge": BRIDGE_NAME,
@@ -81,6 +120,8 @@ def build_manifest(repo_root: Path) -> dict[str, Any]:
         "storage_backend": STORAGE_BACKEND,
         "storage_format": STORAGE_FORMAT,
         "compatibility_line": COMPATIBILITY_LINE,
+        "storage_profile": storage_profile or "unknown",
+        "storage_schema_versions": dict(schema_versions or {}),
         "collection_name": config.collection_name,
         "palace_path_source": get_path_source(),
         "created_at": iso_timestamp_now(),
@@ -102,6 +143,23 @@ def validate_manifest(data: Any) -> str | None:
     collection_name = data.get("collection_name")
     if collection_name is not None and (not isinstance(collection_name, str) or not collection_name.strip()):
         return "collection_name must be a non-empty string when present"
+
+    # Optional provenance fields (older manifests do not carry them).
+    storage_profile = data.get("storage_profile")
+    if storage_profile is not None and (
+        not isinstance(storage_profile, str) or not storage_profile.strip()
+    ):
+        return "storage_profile must be a non-empty string when present"
+
+    schema_versions = data.get("storage_schema_versions")
+    if schema_versions is not None:
+        if not isinstance(schema_versions, dict):
+            return "storage_schema_versions must be a JSON object when present"
+        for key, value in schema_versions.items():
+            if not isinstance(key, str) or not key.strip():
+                return "storage_schema_versions keys must be non-empty strings"
+            if isinstance(value, bool) or not isinstance(value, int):
+                return f"storage_schema_versions[{key!r}] must be an integer"
 
     try:
         datetime.fromisoformat(data["created_at"].replace("Z", "+00:00"))
