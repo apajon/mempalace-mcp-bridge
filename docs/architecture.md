@@ -59,8 +59,12 @@ MCP client (VS Code / Copilot Chat / other)
 |---|---|
 | `uv` | Python environment and package manager |
 | `mempalace` CLI | Indexes files into local memory |
-| `scripts/run_mcp_server.py` | Enforces the supported ChromaDB line, then starts the MCP server |
+| `scripts/run_mcp_server.py` | Enforces the supported ChromaDB line and the palace safety gate, then starts the MCP server |
 | `scripts/link_bridge.sh` | Maintains the canonical symlink `$HOME/.local/share/mempalace-mcp-bridge` |
+| `scripts/runtime_aliases.sh` | Maintains the universal runtime paths `/opt/mempalace-mcp-bridge` and `/mempalace` |
+| `scripts/palace_format_detector.py` | Classifies a palace's storage line without opening it (runtime compatibility) |
+| `scripts/palace_legacy_repair.py` | Detects the storage *profile* (what wrote the schema), runs the fail-closed repair preflight and the narrow legacy repair (`{}` → typed config) |
+| `scripts/palace_safety_gate.py` | Refuses unsafe stable-path operations; authorises only the narrow legacy repair |
 | `mempalace.mcp_server` | Exposes memory as MCP tools |
 | MCP client | Launches the server, sends tool calls |
 | LLM (remote) | Generates responses using memory context |
@@ -71,13 +75,14 @@ MCP client (VS Code / Copilot Chat / other)
 
 1. User opens a chat session in the MCP-compatible client
 2. Client reads `.mcp.json` (or equivalent config)
-3. Client launches `uv run --directory $HOME/.local/share/mempalace-mcp-bridge python scripts/run_mcp_server.py` as a subprocess (the canonical bridge path — a symlink to the real clone)
-4. Server starts in stdio mode and waits for MCP protocol messages
-5. When the user asks a question, the client may call `mempalace` tools
-6. Tools return relevant memory chunks
-7. These chunks are included in the LLM prompt
-8. LLM responds with context-aware output
-9. When the session ends, the server process is killed and will be restarted next time
+3. Client launches `uv run --directory /opt/mempalace-mcp-bridge python scripts/run_mcp_server.py` as a subprocess (the universal runtime bridge path, which resolves to the real clone)
+4. Server enforces the ChromaDB version gate and the palace safety gate
+5. Server starts in stdio mode and waits for MCP protocol messages
+6. When the user asks a question, the client may call `mempalace` tools
+7. Tools return relevant memory chunks
+8. These chunks are included in the LLM prompt
+9. LLM responds with context-aware output
+10. When the session ends, the server process is killed and will be restarted next time
 
 ---
 
@@ -95,11 +100,17 @@ During initialization, the bridge writes `mempalace-bridge-manifest.json` into t
 
 ### Bridge path vs palace path
 
-The bridge repository may be cloned anywhere. Installation exposes a stable
-canonical path — `$HOME/.local/share/mempalace-mcp-bridge` — as a symlink to
-the real clone. The palace remains host-owned under `~/.mempalace` and is never
-stored inside, or tied to, the repository location. See
-[canonical_link.md](canonical_link.md).
+The bridge repository may be cloned anywhere. Installation exposes two layers of
+stable paths:
+
+- the canonical per-user link — `$HOME/.local/share/mempalace-mcp-bridge` — a
+  symlink to the real clone (see [canonical_link.md](canonical_link.md));
+- the universal runtime paths — `/opt/mempalace-mcp-bridge` and `/mempalace` —
+  which are symlinks on the host and bind mounts in a DevContainer, and are the
+  paths referenced by `.mcp.json` (see [runtime_paths.md](runtime_paths.md)).
+
+The palace remains host-owned under `~/.mempalace` and is never stored inside, or
+tied to, the repository location.
 
 ---
 

@@ -79,13 +79,61 @@ uv run --python .venv/bin/python mempalace mine /path/to/your/notes/
 
 **Checklist:**
 
-- Is the path to `uv` absolute and correct?
-  ```bash
-  which uv
-  ```
-- Is the config file in the right place (`.mcp.json` at the workspace root)?
+- Is `.mcp.json` at the workspace root and shaped like the universal config?
+  It must use `"command": "uv"`, `--directory /opt/mempalace-mcp-bridge`,
+  `python scripts/run_mcp_server.py`, and
+  `env.MEMPALACE_PALACE_PATH=/mempalace/palace`.
+  The quickest fix is `bash setup.sh` (or `bash update.sh`), which converges the
+  file while preserving your other MCP servers.
+- Is `uv` on the PATH the client sees? `which uv`
 - Did you reload/restart the MCP client after editing the config?
 - Does the config use `"type": "stdio"`?
+
+---
+
+## `error: No such file or directory (os error 2)` when starting the server
+
+**Symptom:** The client reports the MCP server exited immediately with
+`error: No such file or directory (os error 2)` and exit code `2`.
+
+**Cause:** The universal config launches
+`uv run --directory /opt/mempalace-mcp-bridge ...`, but on this machine the
+runtime alias `/opt/mempalace-mcp-bridge` does not exist. This typically happens
+on an older installation that only created the canonical per-user link.
+
+**Fix:**
+
+```bash
+bash scripts/runtime_aliases.sh --status    # inspect both runtime aliases
+bash setup.sh                               # or: bash update.sh
+```
+
+`setup.sh` / `update.sh` create `/opt/mempalace-mcp-bridge` and `/mempalace`. On
+a fresh, standard Linux host this genuinely needs root: `/opt` and `/` are not
+writable by a normal user.
+
+- `setup.sh` uses the default `auto` mode: if stdin is a TTY it **may prompt you
+  for your sudo password**, so a normal user with working `sudo` never has to
+  copy/paste commands. An alias that is already correct is a no-op and prompts
+  for nothing.
+- `update.sh` runs with `--sudo=diagnose`: it never escalates and never waits for
+  a password. If the aliases are already correct it is a no-op; if root is
+  required it stops and tells you to run `bash setup.sh` (or the printed command).
+
+If the aliases cannot be created, the exact commands to run manually are printed,
+for example:
+
+```bash
+sudo ln -s -- "$HOME/.local/share/mempalace-mcp-bridge" /opt/mempalace-mcp-bridge
+sudo ln -s -- "$HOME/.mempalace" /mempalace
+```
+
+Verify afterwards:
+
+```bash
+readlink -f /opt/mempalace-mcp-bridge   # -> the real clone
+readlink -f /mempalace/palace           # -> $HOME/.mempalace/palace
+```
 
 ---
 
@@ -201,10 +249,55 @@ The stable `main` branch now hard-fails when installed `chromadb` is outside the
 bash verify.sh
 ```
 
-`verify.sh` includes a palace health check (step 9) that detects the broken
-`config_json_str`, creates a backup (`chroma.sqlite3.bak`), and repairs it automatically.
+`verify.sh` classifies the palace using the format detector and the narrow
+legacy-repair preflight.
 
-This bridge now pins ChromaDB to the tested `0.6.x` line during setup and updates, so
+There are two distinct situations, and they are handled differently:
+
+1. **The palace matches the narrow legacy contract.** It stores an untyped
+   `config_json_str` of exactly `{}`, its SQLite integrity check passes, its
+   schema/migrations match the known legacy chain, and its `seq_id` columns store
+   integers. In that case `update.sh` / `setup.sh` create a consistent backup
+   next to the database (via the SQLite backup API, with a timestamped name that
+   never overwrites an existing backup) and rewrite only the
+   `collections.config_json_str` values, inside a transaction. The palace is then
+   re-detected and opened through the real stack as a smoke test.
+
+   ```bash
+   bash update.sh
+   # or, to see the preflight first:
+   python3 scripts/palace_legacy_repair.py ~/.mempalace/palace
+   python3 scripts/palace_legacy_repair.py ~/.mempalace/palace --apply
+   ```
+
+   The contract covers **two** storage profiles, both repairable when they carry
+   an untyped `config_json_str` of exactly `{}`:
+
+   - `chroma_0_6_native` — a native 0.6.x schema (`sysdb 9` / `metadb 4`, blob
+     `seq_id`, no `schema_str`, no 1.x tables);
+   - `chroma_1_x_migrated` — a schema written by ChromaDB 1.x (`sysdb 10` /
+     `metadb 6`, integer `seq_id`, `schema_str`, `acquire_write`,
+     `embedding_metadata_array`).
+
+   A `NULL` configuration is deliberately **not** repairable — the runtime opens a
+   `NULL` config, so the palace needs nothing and is left untouched.
+
+2. **The palace does not match that contract.** Nothing is mutated. The scripts
+   stop with an explicit message listing the failing invariants:
+
+   ```text
+   [ERROR] Palace format is unknown and does not match the narrow legacy repair contract.
+   ```
+
+   In that case the palace is genuinely ambiguous and must be inspected before
+   anything touches it.
+
+The format detector still classifies an untyped `{}` palace as `unknown` — that
+conservatism is intentional, because an untyped config alone cannot prove the
+storage line. Read and write operations stay blocked on such a palace; only the
+dedicated `repair` action is authorised, and only when every invariant passes.
+
+This bridge pins ChromaDB to the tested `0.6.x` line during setup and updates, so
 re-running the latest `bash update.sh` is the safest fix when this regression appears.
 
 If startup or verification now stops with an error like:
@@ -215,7 +308,12 @@ If startup or verification now stops with an error like:
 
 that is the intended guardrail. This stable bridge does not support ChromaDB `1.x`.
 
-**Manual fix** (if the scripts are unavailable):
+**Manual fix** (only if the bridge scripts are unavailable):
+
+> Prefer the dedicated, invariant-checked command:
+> `python3 scripts/palace_legacy_repair.py ~/.mempalace/palace --apply`.
+> It creates a timestamped backup and rolls back on failure. The snippet below
+> performs the equivalent edit by hand and is intentionally generic.
 
 ```bash
 python3 - <<'EOF'

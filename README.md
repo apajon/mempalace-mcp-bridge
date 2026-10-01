@@ -21,7 +21,9 @@ This repo provides a plug-and-play bridge:
 - Built-in verification — `verify.sh` classifies the bridge as healthy, suspicious, or unsafe by checking the environment, the generated MCP config, real MCP startup, and palace manifest drift
 - Palace safety checks — setup, update, verify, and runtime startup reject unsupported `chromadb` versions and keep the bridge on the supported `0.6.x` line
 - Palace format safety gate — risky stable-path operations refuse palaces detected as `chroma_1_x` or `unknown`
-- Palace manifest — setup writes `mempalace-bridge-manifest.json` into the palace root for version traceability
+- Narrow legacy repair — a legacy `{}` palace is repaired automatically **only** when strict invariants hold, with a timestamped SQLite backup and a post-repair smoke test
+- Universal runtime paths — one `.mcp.json` for host and DevContainer (`/opt/mempalace-mcp-bridge`, `/mempalace/palace`)
+- Palace manifest — setup writes `mempalace-bridge-manifest.json` into the palace root for version traceability, recording both the runtime compatibility line and the actual **storage profile** (so a 1.x-migrated schema is never mislabelled as 0.6.x-native)
 - Devcontainer integration — host palace mount shared across environments
 - Safe ChromaDB `0.6.x` ↔ `1.x` reconstruction tooling — non-destructive and runtime-validated
 - Reusable across environments with a shared palace
@@ -29,7 +31,10 @@ This repo provides a plug-and-play bridge:
 > **Compatibility status**
 > This bridge targets ChromaDB `0.6.x` only (`chromadb>=0.6,<0.7`).
 > ChromaDB `1.x` uses an incompatible storage format; non-`0.6.x` installs are rejected at startup.
-> Palaces detected as `chroma_1_x` or `unknown` format are also rejected before any operation.
+> Palaces detected as `chroma_1_x` or `unknown` format are rejected before any read/write operation.
+> The single exception is the narrow legacy repair, which may rewrite an untyped `{}`
+> configuration **only** when a strict, fail-closed preflight confirms the palace matches
+> the documented legacy shape.
 > `main` fails fast when the installed `chromadb` version is outside the `0.6.x` range.
 
 This repository handles the **runtime and setup layer for VS Code Copilot Chat MCP integration**. For structured memory methodology, see [Memory Engineering](#memory-engineering).
@@ -73,21 +78,34 @@ Then reload VS Code (`Ctrl+Shift+P` → **Developer: Reload Window**) if needed.
 
 ## MCP Configuration
 
-The setup script generates `.mcp.json` automatically. To configure manually, create `.mcp.json` in your workspace:
+The setup script generates `.mcp.json` automatically. The config is deliberately
+free of any user-specific path, so **the same file works on the host and inside a
+DevContainer**:
 
 ```json
 {
   "servers": {
     "mempalace": {
       "type": "stdio",
-      "command": "/ABSOLUTE/PATH/TO/uv",
-      "args": ["run", "--directory", "/ABSOLUTE/PATH/TO/mempalace-mcp-bridge", "python", "scripts/run_mcp_server.py"]
+      "command": "uv",
+      "args": ["run", "--directory", "/opt/mempalace-mcp-bridge", "python", "scripts/run_mcp_server.py"],
+      "env": {
+        "MEMPALACE_PALACE_PATH": "/mempalace/palace"
+      }
     }
   }
 }
 ```
 
-Replace paths with the output of `which uv` and the absolute path to this repo.
+`/opt/mempalace-mcp-bridge` and `/mempalace` are *runtime paths*: `setup.sh`
+creates them as symlinks on the host (see `scripts/runtime_aliases.sh`) and they
+are bind mounts inside a devcontainer. That is what removes every
+`/home/<user>` and clone-specific path from the config.
+
+> `uv` must be resolvable on the MCP client's PATH (that is the price of a
+> portable config). See [docs/runtime_paths.md](docs/runtime_paths.md) for the
+> complete path contract.
+
 A ready-to-copy example is at [`examples/mcp/vscode.mcp.json`](examples/mcp/vscode.mcp.json).
 
 See [docs/mcp_vscode.md](docs/mcp_vscode.md) for full details and troubleshooting.
@@ -197,7 +215,10 @@ MemPalace
 Local Memory (palace)  <- ~/.mempalace/palace
 ```
 
-`setup.sh` generates `.mcp.json` with the absolute path to your `uv` binary, so Copilot can start the server without any manual configuration.
+`setup.sh` generates the universal `.mcp.json` — no user-specific path, the bare
+`uv` launcher, and the runtime paths `/opt/mempalace-mcp-bridge` and
+`/mempalace/palace`. So Copilot can start the server without any manual
+configuration, on the host and in a devcontainer alike.
 
 If you already have a legacy `.vscode/mcp.json`, just run:
 
@@ -205,9 +226,10 @@ If you already have a legacy `.vscode/mcp.json`, just run:
 bash setup.sh   # or: bash update.sh
 ```
 
-`setup.sh` / `update.sh` consolidate it into `.mcp.json` (pointing `--directory`
-at the canonical bridge path `$HOME/.local/share/mempalace-mcp-bridge`) and then
+`setup.sh` / `update.sh` consolidate it into the universal `.mcp.json` and then
 remove the obsolete `.vscode/mcp.json` so its stale clone path is never picked up.
+Older configs that embedded an absolute `uv` path, the canonical link, or the
+`python -m mempalace.mcp_server` launcher are migrated automatically.
 
 The same setup step writes `mempalace-bridge-manifest.json` into the palace root. The file is intentionally small and easy to inspect manually: it records the bridge version, MemPalace version, ChromaDB version, Python version, storage backend and format, the supported compatibility line, and the creation timestamp. If a valid manifest already exists, setup preserves it. If the file exists but is malformed, setup replaces it with a fresh valid manifest.
 
@@ -233,6 +255,8 @@ This repository focuses solely on MCP bridge setup and runtime integration. The 
 ### Setup & runtime
 
 * Installation: [docs/installation.md](docs/installation.md)
+* Runtime paths (host + DevContainer): [docs/runtime_paths.md](docs/runtime_paths.md)
+* Canonical bridge link: [docs/canonical_link.md](docs/canonical_link.md)
 * MCP / VS Code config: [docs/mcp_vscode.md](docs/mcp_vscode.md)
 * Update workflow: [docs/update_workflow.md](docs/update_workflow.md)
 * Devcontainer integration: [docs/devcontainer_integration.md](docs/devcontainer_integration.md)
