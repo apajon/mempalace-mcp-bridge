@@ -134,20 +134,33 @@ bash scripts/verify_install.sh    # Confirm everything works
 
 ---
 
-## 9. Canonical bridge path
+## 9. Canonical and runtime paths
 
-The bridge can be cloned anywhere. The installer (`setup.sh`) exposes a single
-stable, location-independent path:
+The bridge can be cloned anywhere. The installer (`setup.sh`) exposes stable,
+location-independent paths in two layers:
 
 ```
-$HOME/.local/share/mempalace-mcp-bridge
+Canonical per-user link:  $HOME/.local/share/mempalace-mcp-bridge
+                          (a symlink to the real clone, via scripts/link_bridge.sh)
+
+Universal runtime paths:  /opt/mempalace-mcp-bridge  ->  the canonical link
+                          /mempalace                 ->  $HOME/.mempalace
+                          (via scripts/runtime_aliases.sh)
 ```
 
-This path is a **symlink** to the real clone, created automatically by
-`setup.sh` (via `scripts/link_bridge.sh`). Consumers — classic workspaces,
-VS Code MCP, devcontainers, scripts — reference only this canonical path and
-never the real clone location.
+The runtime paths are what the generated `.mcp.json` references, and they are the
+reason the **same** `.mcp.json` works both on the host and inside a DevContainer:
+in a container the two runtime paths are bind mounts instead of symlinks.
+
+`/opt` and `/` are root-owned on a standard Linux host, so creating the runtime
+aliases for the first time genuinely requires elevated rights. `setup.sh` runs in
+the default `auto` mode and **may therefore prompt for your sudo password**; an
+alias that is already correct is a no-op and prompts for nothing. `update.sh`
+runs in `diagnose` mode: it never escalates and stops with instructions instead.
+A partially applied state is impossible — both aliases are planned and validated
+before anything is mutated.
 
 The palace stays separate and host-owned under `$HOME/.mempalace`.
 
-See [canonical_link.md](canonical_link.md) for the full contract.
+See [runtime_paths.md](runtime_paths.md) for the full contract and
+[canonical_link.md](canonical_link.md) for the canonical link semantics.

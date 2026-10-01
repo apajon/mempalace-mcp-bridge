@@ -14,6 +14,9 @@ VENV_PYTHON="$REPO_ROOT/.venv/bin/python"
 MCP_CONFIG="$REPO_ROOT/.mcp.json"
 LEGACY_MCP_CONFIG="$REPO_ROOT/.vscode/mcp.json"
 CANONICAL_LINK="${HOME}/.local/share/mempalace-mcp-bridge"
+PALACE_HOME="${HOME}/.mempalace"
+RUNTIME_BRIDGE_PATH="${MEMPALACE_RUNTIME_BRIDGE_PATH:-/opt/mempalace-mcp-bridge}"
+RUNTIME_PALACE_PATH="${MEMPALACE_RUNTIME_PALACE_PATH:-/mempalace/palace}"
 PYTHON_PIN_FILE="$REPO_ROOT/.python-version"
 SUPPORTED_CHROMA_LINE="0.6.x"
 
@@ -28,6 +31,7 @@ pass() { echo "[PASS] $*"; PASS=$((PASS + 1)); }
 warn() { echo "[WARN] $*"; WARN=$((WARN + 1)); }
 fail() { echo "[FAIL] $*"; FAIL=$((FAIL + 1)); }
 detail() { echo "       $*"; }
+info() { echo "[INFO]  $*"; }
 
 resolve_uv_path() {
     if command -v uv &>/dev/null; then
@@ -260,13 +264,14 @@ MCP_COMMAND=""
 MCP_ARGS_JSON=""
 MCP_PARSE_ERROR=""
 MCP_TYPE=""
+MCP_ENV_PALACE=""
 
 if [ ! -f "$MCP_CONFIG" ]; then
     fail "Workspace MCP config missing at $MCP_CONFIG"
     detail "Run: bash setup.sh"
     if [ -f "$LEGACY_MCP_CONFIG" ]; then
         detail "setup.sh will consolidate the legacy .vscode/mcp.json into .mcp.json"
-        detail "with the canonical bridge path ($CANONICAL_LINK)."
+        detail "with the universal runtime path ($RUNTIME_BRIDGE_PATH)."
     fi
 elif grep -q "ABSOLUTE/PATH" "$MCP_CONFIG" 2>/dev/null; then
     fail "Workspace MCP config still contains placeholder paths"
@@ -279,7 +284,14 @@ import json
 from pathlib import Path
 
 config_path = Path(r"$MCP_CONFIG")
-expected_args = ["run", "--directory", r"$CANONICAL_LINK", "python", "scripts/run_mcp_server.py"]
+expected_args = [
+    "run",
+    "--directory",
+    r"$RUNTIME_BRIDGE_PATH",
+    "python",
+    "scripts/run_mcp_server.py",
+]
+expected_palace_env = r"$RUNTIME_PALACE_PATH"
 
 try:
     with config_path.open("r", encoding="utf-8") as handle:
@@ -298,10 +310,15 @@ if not isinstance(server, dict):
     print("parse_error\tmissing 'servers.mempalace' object")
     raise SystemExit(0)
 
+env = server.get("env")
+env_palace = env.get("MEMPALACE_PALACE_PATH", "") if isinstance(env, dict) else ""
+
 print(f"type\t{server.get('type', '')}")
 print(f"command\t{server.get('command', '')}")
 print(f"args_json\t{json.dumps(server.get('args', []))}")
 print(f"expected_args_json\t{json.dumps(expected_args)}")
+print(f"env_palace\t{env_palace}")
+print(f"expected_env_palace\t{expected_palace_env}")
 PYEOF
 )"
     while IFS=$'\t' read -r key value; do
@@ -311,6 +328,8 @@ PYEOF
             command) MCP_COMMAND="$value" ;;
             args_json) MCP_ARGS_JSON="$value" ;;
             expected_args_json) EXPECTED_ARGS_JSON="$value" ;;
+            env_palace) MCP_ENV_PALACE="$value" ;;
+            expected_env_palace) EXPECTED_ENV_PALACE="$value" ;;
         esac
     done <<< "$MCP_INFO"
 
@@ -321,32 +340,77 @@ PYEOF
     elif [ "$MCP_TYPE" != "stdio" ]; then
         fail "Workspace MCP config must use a stdio server"
         detail "Run: bash setup.sh"
-    elif [ -z "$MCP_COMMAND" ]; then
-        fail "Workspace MCP config is missing the launch command"
-        detail "Run: bash setup.sh"
-    elif [[ "$MCP_COMMAND" != /* ]]; then
-        fail "Workspace MCP config must use an absolute uv path"
-        detail "Current command: $MCP_COMMAND"
-        detail "Run: bash setup.sh"
-    elif [ ! -x "$MCP_COMMAND" ]; then
-        fail "Workspace MCP config points to a missing or non-executable uv binary"
-        detail "Current command: $MCP_COMMAND"
+    elif [ "$MCP_COMMAND" != "uv" ]; then
+        fail "Workspace MCP config must launch 'uv' so host and DevContainer share one config"
+        detail "Current command: ${MCP_COMMAND:-<missing>}"
         detail "Run: bash setup.sh"
     elif [ "$MCP_ARGS_JSON" != "$EXPECTED_ARGS_JSON" ]; then
         fail "Workspace MCP config does not use the guarded launcher command"
-        detail "Expected: uv run --directory $CANONICAL_LINK python scripts/run_mcp_server.py"
+        detail "Expected: uv run --directory $RUNTIME_BRIDGE_PATH python scripts/run_mcp_server.py"
+        detail "Run: bash setup.sh"
+    elif [ "$MCP_ENV_PALACE" != "$EXPECTED_ENV_PALACE" ]; then
+        fail "Workspace MCP config must set env.MEMPALACE_PALACE_PATH=$EXPECTED_ENV_PALACE"
+        detail "Current value: ${MCP_ENV_PALACE:-<missing>}"
         detail "Run: bash setup.sh"
     else
-        pass "Workspace MCP config points to the guarded launcher ($MCP_CONFIG)"
+        pass "Workspace MCP config is the universal host/DevContainer config ($MCP_CONFIG)"
         MCP_CONFIG_OK=true
-
-        if [ -n "$EXPECTED_UV" ] && [ "$MCP_COMMAND" != "$EXPECTED_UV" ]; then
-            warn "Workspace MCP config uses a different uv path than the active shell"
-            detail "Config: $MCP_COMMAND"
-            detail "Shell:  $EXPECTED_UV"
-            detail "If this drift is unintended, run: bash setup.sh"
-        fi
     fi
+fi
+
+# ─── 8c. Universal runtime aliases ────────────────────────────────────────────
+#
+# The universal config references /opt/mempalace-mcp-bridge and /mempalace/palace.
+# On the host these must resolve to the canonical link and the palace home. In a
+# DevContainer they are bind mounts instead, so a real (non-symlink) directory is
+# also accepted as long as it exposes the expected content.
+
+REPO_ROOT_PHYS_ALIAS="$(cd "$REPO_ROOT" && pwd -P)"
+
+check_bridge_runtime_alias() {
+    if [ ! -e "$RUNTIME_BRIDGE_PATH" ] && [ ! -L "$RUNTIME_BRIDGE_PATH" ]; then
+        fail "Universal runtime bridge path is missing: $RUNTIME_BRIDGE_PATH"
+        detail "Run: bash setup.sh (may require sudo for /opt)"
+        return
+    fi
+
+    if [ -f "$RUNTIME_BRIDGE_PATH/pyproject.toml" ]; then
+        pass "Universal runtime bridge path resolves to the bridge ($RUNTIME_BRIDGE_PATH)"
+    else
+        fail "Universal runtime bridge path does not expose the bridge ($RUNTIME_BRIDGE_PATH)"
+        detail "Run: bash setup.sh (may require sudo for /opt)"
+    fi
+}
+
+check_palace_runtime_alias() {
+    local runtime_root="${RUNTIME_PALACE_PATH%/palace}"
+    [ -n "$runtime_root" ] || runtime_root="/"
+
+    if [ ! -e "$RUNTIME_PALACE_PATH" ]; then
+        fail "Universal runtime palace path is missing: $RUNTIME_PALACE_PATH"
+        detail "Run: bash setup.sh (may require sudo), or mount ~/.mempalace in the DevContainer"
+        return
+    fi
+
+    if [ -f "$RUNTIME_PALACE_PATH/chroma.sqlite3" ]; then
+        pass "Universal runtime palace path resolves to a palace database ($RUNTIME_PALACE_PATH)"
+    else
+        warn "Universal runtime palace path exists but has no database yet ($RUNTIME_PALACE_PATH)"
+    fi
+
+    # On the host the runtime root should be a symlink to $HOME/.mempalace.
+    if [ -L "$runtime_root" ] && [ "$(readlink -f "$runtime_root" 2>/dev/null || true)" != "$(cd "$PALACE_HOME" 2>/dev/null && pwd -P)" ]; then
+        warn "Runtime palace root $runtime_root does not resolve to $PALACE_HOME"
+        detail "Run: bash setup.sh"
+    fi
+}
+
+check_bridge_runtime_alias
+check_palace_runtime_alias
+
+# Make the palace checks below evaluate the exact palace the MCP server will use.
+if [ -n "$MCP_ENV_PALACE" ]; then
+    export MEMPALACE_PALACE_PATH="$MCP_ENV_PALACE"
 fi
 
 # ─── 8b. Canonical bridge link ────────────────────────────────────────────────
@@ -373,7 +437,8 @@ fi
 
 if [ "$MCP_CONFIG_OK" = true ]; then
     MCP_LAUNCH_LOG="$TMPDIR/mcp-launch.log"
-    "${MCP_COMMAND}" run --directory "$CANONICAL_LINK" python scripts/run_mcp_server.py < <(sleep 5) >"$MCP_LAUNCH_LOG" 2>&1 &
+    MCP_LAUNCH_UV="${EXPECTED_UV:-$MCP_COMMAND}"
+    "${MCP_LAUNCH_UV}" run --directory "$RUNTIME_BRIDGE_PATH" python scripts/run_mcp_server.py < <(sleep 5) >"$MCP_LAUNCH_LOG" 2>&1 &
     SERVER_PID=$!
     sleep 2
 
@@ -432,31 +497,62 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(r"$REPO_ROOT") / "scripts"))
 
+from palace_legacy_repair import detect_storage_profile  # type: ignore
 from palace_safety_gate import evaluate_palace_safety  # type: ignore
 
-result = evaluate_palace_safety(Path(r"$PALACE_PATH"), "read")
+palace = Path(r"$PALACE_PATH")
+result = evaluate_palace_safety(palace, "read")
+profile = detect_storage_profile(palace)
+versions = ", ".join(f"{key}={value}" for key, value in sorted(profile.schema_versions.items()))
 print(f"allowed\t{1 if result.allowed else 0}")
 print(f"classification\t{result.classification}")
 print(f"message\t{result.message}")
+print(f"profile\t{profile.profile}")
+print(f"schema_versions\t{versions}")
 PYEOF
 )"
         PALACE_SAFETY_ALLOWED=""
         PALACE_SAFETY_CLASS=""
         PALACE_SAFETY_MESSAGE=""
+        PALACE_STORAGE_PROFILE=""
+        PALACE_SCHEMA_VERSIONS=""
         while IFS=$'\t' read -r key value; do
             case "$key" in
                 allowed) PALACE_SAFETY_ALLOWED="$value" ;;
                 classification) PALACE_SAFETY_CLASS="$value" ;;
                 message) PALACE_SAFETY_MESSAGE="$value" ;;
+                profile) PALACE_STORAGE_PROFILE="$value" ;;
+                schema_versions) PALACE_SCHEMA_VERSIONS="$value" ;;
             esac
         done <<< "$PALACE_SAFETY_RESULT"
 
         if [ "$PALACE_SAFETY_ALLOWED" = "1" ]; then
-            pass "Palace format is safe for the stable path ($PALACE_SAFETY_CLASS)"
+            # Two distinct notions: this line is about runtime compatibility, the
+            # INFO lines below are about what actually wrote the schema.
+            pass "Palace is compatible with the supported $SUPPORTED_CHROMA_LINE runtime"
+            if [ -n "$PALACE_STORAGE_PROFILE" ] && [ "$PALACE_STORAGE_PROFILE" != "unknown" ]; then
+                info "Storage profile: $PALACE_STORAGE_PROFILE"
+                if [ -n "$PALACE_SCHEMA_VERSIONS" ]; then
+                    detail "schema versions: $PALACE_SCHEMA_VERSIONS"
+                fi
+            fi
         else
             PALACE_SAFE=false
-            fail "Palace format is unsafe for the stable path ($PALACE_SAFETY_CLASS)"
-            detail "$PALACE_SAFETY_MESSAGE"
+            if [ -n "$PALACE_STORAGE_PROFILE" ] && [ "$PALACE_STORAGE_PROFILE" != "unknown" ]; then
+                info "Storage profile: $PALACE_STORAGE_PROFILE"
+                if [ -n "$PALACE_SCHEMA_VERSIONS" ]; then
+                    detail "schema versions: $PALACE_SCHEMA_VERSIONS"
+                fi
+            fi
+            if "$VENV_PYTHON" "$REPO_ROOT/scripts/palace_legacy_repair.py" "$PALACE_PATH" >/dev/null 2>&1; then
+                fail "Palace requires the narrow legacy repair before the runtime can open it"
+                detail "Detected format: $PALACE_SAFETY_CLASS (repairable legacy profile)"
+                detail "Run: bash update.sh"
+                detail "Or:  python3 scripts/palace_legacy_repair.py $PALACE_PATH --apply"
+            else
+                fail "Palace is NOT compatible with the supported $SUPPORTED_CHROMA_LINE runtime ($PALACE_SAFETY_CLASS)"
+                detail "$PALACE_SAFETY_MESSAGE"
+            fi
             detail "Palace health and manifest trust checks were skipped to avoid opening it with the wrong stack."
         fi
     fi

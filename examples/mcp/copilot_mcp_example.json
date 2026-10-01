@@ -1,11 +1,14 @@
 {
   "_comment": "Generic MCP stdio server config. Adapt to your specific MCP client's config format.",
-  "_note": "Replace /ABSOLUTE/PATH/TO/uv with the output of: which uv. The --directory value is the canonical bridge path $HOME/.local/share/mempalace-mcp-bridge, a symlink created by setup.sh — it does NOT depend on where the repo is cloned.",
+  "_note": "This is the universal config: it works unchanged on the host and inside a DevContainer because it contains no user-specific path. 'uv' must be resolvable on the MCP client's PATH. /opt/mempalace-mcp-bridge and /mempalace are runtime aliases created on the host by setup.sh (scripts/runtime_aliases.sh) and provided by bind mounts in a DevContainer.",
   "servers": {
     "mempalace": {
-      "command": "/ABSOLUTE/PATH/TO/uv",
-      "args": ["run", "--directory", "$HOME/.local/share/mempalace-mcp-bridge", "python", "scripts/run_mcp_server.py"],
-      "env": {}
+      "type": "stdio",
+      "command": "uv",
+      "args": ["run", "--directory", "/opt/mempalace-mcp-bridge", "python", "scripts/run_mcp_server.py"],
+      "env": {
+        "MEMPALACE_PALACE_PATH": "/mempalace/palace"
+      }
     }
   }
 }

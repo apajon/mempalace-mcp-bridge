@@ -26,6 +26,19 @@ echo ""
 info "Creating canonical bridge link..."
 bash "$REPO_ROOT/scripts/link_bridge.sh"
 
+# ─── Universal runtime aliases ───────────────────────────────────────────────
+# /opt/mempalace-mcp-bridge and /mempalace make the same .mcp.json work on the
+# host and inside the DevContainer. Without them the generated config (which
+# intentionally embeds no user-specific path) cannot start the server.
+#
+# On a fresh, standard Linux host these two paths genuinely need root: `/opt` and
+# `/` are not writable by a normal user. This step therefore uses the default
+# `auto` sudo mode, so an interactive install MAY prompt for your sudo password.
+# An alias that is already correct is a no-op and prompts for nothing.
+
+info "Ensuring universal runtime aliases (may require sudo on a fresh host)..."
+bash "$REPO_ROOT/scripts/runtime_aliases.sh"
+
 # ─── 1. Bootstrap (uv + MemPalace) ───────────────────────────────────────────
 
 info "Step 1/4 — Installing dependencies..."

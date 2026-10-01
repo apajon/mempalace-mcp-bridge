@@ -18,28 +18,36 @@ This means **you never need to run `run_manual_mcp.sh` in a terminal** — the c
 
 ## MCP config for VS Code / Copilot Chat
 
-Create or edit `.mcp.json` in your workspace:
+`setup.sh` generates `.mcp.json` for you. The config is deliberately
+user-agnostic so that the **same file** works on the host and inside a
+DevContainer:
 
 ```json
 {
   "servers": {
     "mempalace": {
       "type": "stdio",
-      "command": "/ABSOLUTE/PATH/TO/uv",
-      "args": ["run", "--directory", "$HOME/.local/share/mempalace-mcp-bridge", "python", "scripts/run_mcp_server.py"]
+      "command": "uv",
+      "args": ["run", "--directory", "/opt/mempalace-mcp-bridge", "python", "scripts/run_mcp_server.py"],
+      "env": {
+        "MEMPALACE_PALACE_PATH": "/mempalace/palace"
+      }
     }
   }
 }
 ```
 
-Replace `/ABSOLUTE/PATH/TO/uv` with the actual path to your `uv` binary:
+A ready-to-copy example is at `examples/mcp/vscode.mcp.json`. See
+[runtime_paths.md](runtime_paths.md) for the full path contract.
 
-```bash
-which uv
-# /home/yourname/.cargo/bin/uv
-```
+`/opt/mempalace-mcp-bridge` and `/mempalace` are runtime paths:
 
-A ready-to-copy example is at `examples/mcp/vscode.mcp.json`.
+- on the host, `setup.sh` creates them as symlinks via
+  `scripts/runtime_aliases.sh`;
+- inside a DevContainer, they are bind mounts.
+
+Either way, the MCP config never needs to know where the repo was cloned or what
+the user's home directory is called.
 
 If you have an older `.vscode/mcp.json`, just run:
 
@@ -47,43 +55,58 @@ If you have an older `.vscode/mcp.json`, just run:
 bash setup.sh   # or: bash update.sh
 ```
 
-`setup.sh` / `update.sh` consolidate it into `.mcp.json` (pointing `--directory`
-at the canonical bridge path `$HOME/.local/share/mempalace-mcp-bridge`) and then
+`setup.sh` / `update.sh` consolidate it into the universal `.mcp.json` and then
 remove the obsolete `.vscode/mcp.json` so its stale clone path is never picked up.
 
-> **Why absolute path?** MCP clients often launch processes in a limited environment where `$PATH` may not include your shell's customizations. Using an absolute path avoids "command not found" errors.
+> **`uv` must be on the client's PATH.** The config uses the bare `uv` command
+> (that is what makes it portable). MCP clients often launch processes in a
+> limited environment, so make sure `uv` is installed in a directory that is on
+> the PATH the client sees (see *What to do if uv is not found* below).
 
 ---
 
 ## Working directory
 
-`uv run --directory $HOME/.local/share/mempalace-mcp-bridge python scripts/run_mcp_server.py` should be run from the canonical bridge path so the guarded launcher can enforce the supported ChromaDB line before starting `mempalace.mcp_server`.
+`uv run --directory /opt/mempalace-mcp-bridge python scripts/run_mcp_server.py` is
+run from the universal runtime bridge path so the guarded launcher can enforce
+the supported ChromaDB line and the palace safety gate before starting
+`mempalace.mcp_server`.
 
-`$HOME/.local/share/mempalace-mcp-bridge` is a symlink to the real clone,
-created automatically by `setup.sh` (see [canonical_link.md](canonical_link.md)).
+`/opt/mempalace-mcp-bridge` resolves to the real clone through the canonical
+symlink `$HOME/.local/share/mempalace-mcp-bridge`, which `setup.sh` creates (see
+[canonical_link.md](canonical_link.md) and [runtime_paths.md](runtime_paths.md)).
 You never need to hard-code the clone location.
 
-If not, ensure `mempalace init` was run in or near the workspace that the MCP client opens.
+If the server starts but returns nothing, ensure `mempalace init` was run in or
+near the workspace that the MCP client opens.
 
 ---
 
 ## What to do if uv is not found
 
+The universal config uses the bare `uv` command, so `uv` must be resolvable on
+the PATH that the MCP client sees.
+
 1. Find where `uv` is installed:
 
 ```bash
 which uv
-# or
-find ~/.cargo ~/.local -name uv 2>/dev/null
+# /home/yourname/.cargo/bin/uv
 ```
 
-2. Use that absolute path in the MCP config.
-
-3. If `uv` is not installed at all, run:
+2. If `uv` is not installed at all, install it:
 
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
+
+3. Make sure the directory that contains `uv` is on the PATH the MCP client
+   inherits (`~/.cargo/bin` or `~/.local/bin` in a typical install). Reload
+   VS Code after changing your shell environment.
+
+`verify.sh` reports `[FAIL] ... must launch 'uv' ...` if the config was
+customised to embed an absolute `uv` path, and `bash setup.sh` restores the
+portable config.
 
 ---
 

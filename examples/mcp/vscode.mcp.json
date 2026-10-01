@@ -1,10 +1,13 @@
 {
-  "_note": "This is a template. setup.sh generates the real .mcp.json automatically, pointing --directory at the canonical bridge path $HOME/.local/share/mempalace-mcp-bridge (a symlink created by setup.sh).",
+  "_note": "This template is byte-for-byte the config that setup.sh generates in .mcp.json. It contains no user-specific path: the launcher is the bare 'uv' command, --directory is the universal runtime bridge path /opt/mempalace-mcp-bridge, and the palace is /mempalace/palace. On the host those two runtime paths are symlinks created by setup.sh (scripts/runtime_aliases.sh: /opt/mempalace-mcp-bridge -> $HOME/.local/share/mempalace-mcp-bridge, /mempalace -> $HOME/.mempalace). Inside a DevContainer the same two paths exist as bind mounts. That is why one and the same .mcp.json works in both places.",
   "servers": {
     "mempalace": {
       "type": "stdio",
-      "command": "/ABSOLUTE/PATH/TO/uv",
-      "args": ["run", "--directory", "$HOME/.local/share/mempalace-mcp-bridge", "python", "scripts/run_mcp_server.py"]
+      "command": "uv",
+      "args": ["run", "--directory", "/opt/mempalace-mcp-bridge", "python", "scripts/run_mcp_server.py"],
+      "env": {
+        "MEMPALACE_PALACE_PATH": "/mempalace/palace"
+      }
     }
   }
 }

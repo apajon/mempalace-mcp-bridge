@@ -22,16 +22,18 @@ Mounting the palace from the host ensures consistency across:
 
 | Element | Host side | Container side |
 |---|---|---|
-| **MCP bridge** (`mempalace-mcp-bridge`) | `$HOME/.local/share/mempalace-mcp-bridge` (symlink to the real clone) | mounted read-only at `/opt/mempalace-mcp-bridge` |
-| **Palace** (`~/.mempalace`) | `~/.mempalace` | `~/.mempalace` of the container user |
+| **MCP bridge** (`mempalace-mcp-bridge`) | `/opt/mempalace-mcp-bridge` → `$HOME/.local/share/mempalace-mcp-bridge` (symlink to the real clone) | mounted read-only at `/opt/mempalace-mcp-bridge` |
+| **Palace** (`~/.mempalace`) | `$HOME/.mempalace` | mounted at `/mempalace` |
 
-**The bridge is not cloned inside the container.** Keeping it on the host and mounting it at a fixed path (`/opt/mempalace-mcp-bridge`) means scripts, MCP config, and hooks always reference the same location regardless of where each developer stores the repo on their machine.
+**The bridge is not cloned inside the container.** Keeping it on the host and mounting it at the universal runtime path (`/opt/mempalace-mcp-bridge`) means scripts, MCP config, and hooks always reference the same location regardless of where each developer stores the repo on their machine.
 
-The host-side source is the **canonical bridge path** `$HOME/.local/share/mempalace-mcp-bridge`, which `setup.sh` creates as a symlink to the real clone (see [canonical_link.md](canonical_link.md)). The real clone may live anywhere; the devcontainer never needs to know where.
+The host-side source is the **canonical bridge path** `$HOME/.local/share/mempalace-mcp-bridge`, which `setup.sh` creates as a symlink to the real clone (see [canonical_link.md](canonical_link.md)). `setup.sh` also creates the runtime alias `/opt/mempalace-mcp-bridge` pointing at it (see [runtime_paths.md](runtime_paths.md)). The real clone may live anywhere; the devcontainer never needs to know where.
 
-**A shared palace is used** so that everything the agent stores inside the container is immediately visible on the host, and vice versa. The bind mount ensures both environments point to the same data without copying or syncing.
+**A shared palace is used** so that everything the agent stores inside the container is immediately visible on the host, and vice versa. The palace is mounted at `/mempalace`, which is the same path the host exposes through its own runtime alias. Both environments therefore address the palace as `/mempalace/palace` and no copying or syncing is needed.
 
-**`MEMPALACE_PALACE_PATH` is set explicitly** in the MCP config to override any `config.json` that may have been inherited from another machine. This eliminates path/config inconsistencies caused by environment-specific differences in home directory layout or previous initializations.
+**`MEMPALACE_PALACE_PATH=/mempalace/palace` is set explicitly** in `.mcp.json` to override any `config.json` that may have been inherited from another machine. This also removes any dependency on the container user's home directory.
+
+**The `.mcp.json` file is identical host-side and container-side.** Because both sides expose `/opt/mempalace-mcp-bridge` and `/mempalace`, the same file works in both places with no `<container-user>` substitution.
 
 > The bridge is mounted **read-only** at `/opt/mempalace-mcp-bridge`. Nothing is written back to the host repo.
 
@@ -41,7 +43,8 @@ The host-side source is the **canonical bridge path** `$HOME/.local/share/mempal
 
 > The bridge may be cloned anywhere. The only requirement is that the normal
 > bridge install has been run once, which creates the canonical symlink at
-> `$HOME/.local/share/mempalace-mcp-bridge`.
+> `$HOME/.local/share/mempalace-mcp-bridge` **and** the runtime alias
+> `/opt/mempalace-mcp-bridge`.
 
 1. Clone the `mempalace-mcp-bridge` repo wherever you like:
 
@@ -51,7 +54,9 @@ The host-side source is the **canonical bridge path** `$HOME/.local/share/mempal
    ```
 
 2. Run the normal bridge install once. This creates the canonical symlink
-   `$HOME/.local/share/mempalace-mcp-bridge` pointing at the real clone:
+   `$HOME/.local/share/mempalace-mcp-bridge` pointing at the real clone, and the
+   runtime aliases `/opt/mempalace-mcp-bridge` and `/mempalace` (the latter two
+   may require elevated rights on `/opt` / `/`):
 
    ```bash
    bash ~/git/mempalace-mcp-bridge/setup.sh   # or the path where you cloned it
@@ -85,17 +90,19 @@ In `devcontainer.json`, add the following mounts:
 ```json
 "mounts": [
   "source=${localEnv:HOME}/.local/share/mempalace-mcp-bridge,target=/opt/mempalace-mcp-bridge,type=bind,consistency=cached,readonly",
-  "source=${localEnv:HOME}/.mempalace,target=/home/<container-user>/.mempalace,type=bind"
+  "source=${localEnv:HOME}/.mempalace,target=/mempalace,type=bind"
 ]
 ```
 
 > The bridge mount source is the canonical symlink created by `setup.sh`;
 > Docker resolves the symlink and mounts the real clone.
 >
-> Replace `<container-user>` with the username inside the container (`dev`, `vscode`, `user`, etc.).
-> Check with `whoami` in a devcontainer terminal.
+> The palace mount target is exactly `/mempalace` — the same path the host
+> exposes through its runtime alias. That is what makes the universal
+> `.mcp.json` work unchanged in both places.
 >
-> If `${localEnv:HOME}` is unreliable on your platform, replace it with an explicit absolute host path.
+> If `${localEnv:HOME}` is unreliable on your platform, replace it with an
+> explicit absolute host path.
 
 ---
 
@@ -127,21 +134,23 @@ fi
 
 ## Step 4 — Configure the MCP server in VS Code
 
-In `.mcp.json` at the devcontainer workspace root:
+The workspace `.mcp.json` is **the same file** on the host and in the container.
+`setup.sh` generates it, and it contains no container-specific or user-specific
+path:
 
 ```json
 {
   "servers": {
     "mempalace": {
       "type": "stdio",
-      "command": "/home/<container-user>/.local/bin/uv",
-       "args": [
-         "run",
-         "--directory", "/opt/mempalace-mcp-bridge",
-         "python", "scripts/run_mcp_server.py"
-       ],
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory", "/opt/mempalace-mcp-bridge",
+        "python", "scripts/run_mcp_server.py"
+      ],
       "env": {
-        "MEMPALACE_PALACE_PATH": "/home/<container-user>/.mempalace/palace"
+        "MEMPALACE_PALACE_PATH": "/mempalace/palace"
       }
     }
   }
@@ -149,10 +158,23 @@ In `.mcp.json` at the devcontainer workspace root:
 ```
 
 **Why `MEMPALACE_PALACE_PATH`?**
-Without this variable, the MCP server looks for the palace in the current container user's home directory. The variable makes it explicit and takes priority over any `config.json` inherited from another machine.
+Without this variable, the MCP server looks for the palace in the current user's
+home directory, which differs between the host and the container. The variable
+makes the palace location explicit and takes priority over any `config.json`
+inherited from another machine.
 Configuration priority: `MEMPALACE_PALACE_PATH` > `~/.mempalace/config.json` > default.
 
+**Why `command: "uv"` and not an absolute path?**
+An absolute `uv` path differs between the host and the container, which would
+break the "same config everywhere" contract. The trade-off is that `uv` must be
+resolvable on the PATH the MCP client sees. Install `uv` into the image so it is
+on the default PATH (see *Prerequisites*).
+
 VS Code Copilot will start the MCP server automatically when the chat is opened.
+
+> Do **not** re-add a `/home/<container-user>/...` path here. If `verify.sh`
+> reports that the config is not the universal config, run `bash setup.sh` (or
+> `bash update.sh`) to regenerate it.
 
 ---
 
@@ -160,9 +182,9 @@ VS Code Copilot will start the MCP server automatically when the chat is opened.
 
 | File | Change |
 |---|---|
-| `devcontainer.json` | Robust `initializeCommand` + readonly mount from `${localEnv:HOME}/.local/share/mempalace-mcp-bridge` (the canonical bridge path) |
+| `devcontainer.json` | Robust `initializeCommand` + readonly mount `${localEnv:HOME}/.local/share/mempalace-mcp-bridge` → `/opt/mempalace-mcp-bridge`, and `${localEnv:HOME}/.mempalace` → `/mempalace` |
 | `post-create.sh` | Conditional block: `UV_PROJECT_ENVIRONMENT=... uv sync` + `check_palace_health.sh` |
-| `.mcp.json` | MCP server config with `env.MEMPALACE_PALACE_PATH` |
+| `.mcp.json` | The universal MCP config (generated by `setup.sh`, identical on host and container) |
 
 ---
 
@@ -174,7 +196,7 @@ VS Code Copilot will start the MCP server automatically when the chat is opened.
 | `MemPalace: not available, skipping` | Empty mount — `pyproject.toml` missing | Verify that `$HOME/.local/share/mempalace-mcp-bridge` exists on the host and resolves to the real clone, and that the mount points to it |
 | Bridge mount is empty in the container | `$HOME/.local/share/mempalace-mcp-bridge` is missing on the host or mounted from the wrong absolute path | Run `bash setup.sh` in the real clone to create the canonical symlink, or replace the mount source with the correct absolute host path |
 | `uv sync` fails with a write or permission error under `/opt/mempalace-mcp-bridge` | The bridge repo is mounted read-only | Set `UV_PROJECT_ENVIRONMENT=/home/<container-user>/.venv/mempalace-mcp-bridge` before `uv sync` |
-| `"No palace found"` in MCP tools | Palace not mounted or `MEMPALACE_PALACE_PATH` missing/incorrect | Check the `~/.mempalace` bind mount and the `env.MEMPALACE_PALACE_PATH` key in `.mcp.json` |
-| Palace present on host but empty in container | Incorrect `<container-user>` in the mount or in `MEMPALACE_PALACE_PATH` | Run `whoami` inside the container and fix both occurrences of `<container-user>` |
-| MCP server does not start | Incorrect `uv` path in `.mcp.json` | Check with `which uv` in a devcontainer terminal and fix the `command` key |
-| `uv: command not found` in container | `uv` missing from the Docker image | Add `RUN pip install uv` to the Dockerfile or via an `onCreateCommand` |
+| `"No palace found"` in MCP tools | Palace not mounted at `/mempalace`, or `MEMPALACE_PALACE_PATH` missing/incorrect | Check the `${localEnv:HOME}/.mempalace` → `/mempalace` bind mount and the `env.MEMPALACE_PALACE_PATH` key in `.mcp.json` |
+| Palace present on host but empty in container | The palace mount target is not `/mempalace` | Mount `${localEnv:HOME}/.mempalace` at target `/mempalace` exactly |
+| MCP server does not start (host or container) | The config is not the universal config (e.g. still embeds an absolute `uv` path or a `/home/<user>` path) | Run `bash setup.sh` (or `bash update.sh`) to regenerate `.mcp.json`, then reload the window |
+| `uv: command not found` in container | `uv` missing from the Docker image PATH | Install `uv` in the image (`RUN pip install uv`) so it is on the default PATH |

@@ -3,21 +3,29 @@
 #
 # Owns the host-side MCP workspace config (.mcp.json).
 #
-# The host config must reference the canonical, location-independent bridge path:
+# The config must be identical on the host and inside the DevContainer, so it
+# must not embed any user-specific path. It converges to the universal config:
 #
-#     $HOME/.local/share/mempalace-mcp-bridge
+#     command: "uv"
+#     args:    ["run", "--directory", "/opt/mempalace-mcp-bridge",
+#               "python", "scripts/run_mcp_server.py"]
+#     env:     {"MEMPALACE_PALACE_PATH": "/mempalace/palace"}
 #
-# and must NEVER reference the physical clone path. The physical clone may live
-# anywhere; setup.sh / update.sh create a symlink at the canonical path pointing
-# at it (see scripts/link_bridge.sh), and this script writes the MCP config so
-# that VS Code / Copilot launch the server through that symlink.
+# `/opt/mempalace-mcp-bridge` and `/mempalace` are runtime aliases owned by
+# scripts/runtime_aliases.sh (on the host) and by bind mounts (in the
+# DevContainer). The physical clone may live anywhere and the palace stays
+# host-owned under $HOME/.mempalace.
 #
 # Responsibilities:
 #   - generate .mcp.json when it is missing
-#   - repair only servers.mempalace when its uv command or --directory path is
-#     stale, preserving every other server and top-level key
-#   - remove the obsolete .vscode/mcp.json so its stale physical path can never
-#     be picked up alongside .mcp.json
+#   - repair only servers.mempalace when it diverges, preserving every other
+#     server, every unrelated top-level key, and unrelated keys inside the
+#     mempalace entry itself
+#   - migrate the known legacy shapes: absolute uv command, canonical-link or
+#     physical-clone --directory, `python -m mempalace.mcp_server` launcher,
+#     missing/old MEMPALACE_PALACE_PATH
+#   - remove the obsolete .vscode/mcp.json so its stale path can never be
+#     picked up alongside .mcp.json
 #
 # Idempotent: a second run rewrites nothing when the config is already correct.
 #
@@ -26,13 +34,19 @@
 #
 # Like link_bridge.sh, the repository root is derived from THIS script's own
 # location (BASH_SOURCE), never from the caller's working directory.
+#
+# Testing / override seams (not part of the user-facing contract):
+#   MEMPALACE_RUNTIME_BRIDGE_PATH  (default /opt/mempalace-mcp-bridge)
+#   MEMPALACE_RUNTIME_PALACE_PATH  (default /mempalace/palace)
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
 
-CANONICAL_LINK="${HOME}/.local/share/mempalace-mcp-bridge"
+RUNTIME_BRIDGE_PATH="${MEMPALACE_RUNTIME_BRIDGE_PATH:-/opt/mempalace-mcp-bridge}"
+RUNTIME_PALACE_PATH="${MEMPALACE_RUNTIME_PALACE_PATH:-/mempalace/palace}"
+
 MCP_CONFIG="$REPO_ROOT/.mcp.json"
 LEGACY_MCP_CONFIG="$REPO_ROOT/.vscode/mcp.json"
 
@@ -41,21 +55,19 @@ ok()   { echo "[OK]    $*"; }
 warn() { echo "[WARN]  $*"; }
 fail() { echo "[ERROR] $*" >&2; exit 1; }
 
-# Resolve the uv binary the same way the rest of the repo does, without relying
-# on a .venv (so this can run before bootstrap and under a fake HOME in tests).
-resolve_uv_path() {
+# Warns when the launcher cannot be resolved by the MCP client. The config
+# deliberately does not embed a uv path (it must stay portable), so this is a
+# warning rather than a hard failure.
+check_uv_on_path() {
     if command -v uv >/dev/null 2>&1; then
-        command -v uv
         return 0
     fi
-    local candidate
     for candidate in "$HOME/.cargo/bin/uv" "$HOME/.local/bin/uv"; do
-        if [ -x "$candidate" ]; then
-            echo "$candidate"
-            return 0
-        fi
+        [ -x "$candidate" ] && return 0
     done
-    return 1
+    warn "uv was not found on PATH — the MCP client must be able to resolve 'uv'."
+    warn "Install it (https://astral.sh/uv) or make sure it is on the client's PATH."
+    return 0
 }
 
 # A python3 interpreter for JSON parsing. Prefer system python3 (available in
@@ -75,10 +87,10 @@ resolve_json_python() {
 JSON_PYTHON="$(resolve_json_python)"
 
 # Updates only .servers.mempalace in .mcp.json, preserving every other
-# top-level key and every unrelated server. The read-modify-write happens in
-# Python so unrelated content survives untouched, and the file is written
-# atomically (temp file + rename) only when the mempalace entry actually needs
-# to change.
+# top-level key, every unrelated server, and unrelated keys inside the
+# mempalace entry. The read-modify-write happens in Python so unrelated content
+# survives untouched, and the file is written atomically (temp file + rename)
+# only when the mempalace entry actually needs to change.
 #
 # Prints exactly one token on stdout:
 #   current  -> .mcp.json already correct, nothing written
@@ -86,20 +98,15 @@ JSON_PYTHON="$(resolve_json_python)"
 #   updated  -> only servers.mempalace was inserted/replaced, all else preserved
 #   invalid  -> .mcp.json exists but is not valid JSON, left untouched (error)
 update_config() {
-    local uv_path="$1"
-    "$JSON_PYTHON" - "$MCP_CONFIG" "$uv_path" "$CANONICAL_LINK" <<'PYEOF'
+    "$JSON_PYTHON" - "$MCP_CONFIG" "$RUNTIME_BRIDGE_PATH" "$RUNTIME_PALACE_PATH" <<'PYEOF'
 import json
 import os
 import sys
 import tempfile
 
-cfg_path, uv_path, canonical = sys.argv[1], sys.argv[2], sys.argv[3]
+cfg_path, runtime_bridge, runtime_palace = sys.argv[1], sys.argv[2], sys.argv[3]
 
-expected_entry = {
-    "type": "stdio",
-    "command": uv_path,
-    "args": ["run", "--directory", canonical, "python", "scripts/run_mcp_server.py"],
-}
+expected_args = ["run", "--directory", runtime_bridge, "python", "scripts/run_mcp_server.py"]
 
 created = not os.path.exists(cfg_path)
 
@@ -130,12 +137,27 @@ if not isinstance(servers, dict):
     servers = {}
     cfg["servers"] = servers
 
-# Only the mempalace entry is owned; everything else is preserved verbatim.
-if not created and servers.get("mempalace") == expected_entry:
+existing = servers.get("mempalace")
+if not isinstance(existing, dict):
+    existing = {}
+
+# Rebuild only the fields this script owns, preserving any other key a user may
+# have added inside the mempalace entry (e.g. "disabled", "autoApprove").
+merged = dict(existing)
+merged["type"] = "stdio"
+merged["command"] = "uv"
+merged["args"] = expected_args
+
+env = merged.get("env")
+env = dict(env) if isinstance(env, dict) else {}
+env["MEMPALACE_PALACE_PATH"] = runtime_palace
+merged["env"] = env
+
+if not created and existing == merged:
     print("current")
     raise SystemExit(0)
 
-servers["mempalace"] = expected_entry
+servers["mempalace"] = merged
 
 # Preserve the original file mode when present, defaulting to 0o644.
 mode = None
@@ -166,11 +188,10 @@ PYEOF
 }
 
 ensure_config() {
-    local uv_path
-    uv_path="$(resolve_uv_path)" || fail "uv not found — cannot write MCP config."
+    check_uv_on_path
 
     local result
-    if ! result="$(update_config "$uv_path" 2>&1)"; then
+    if ! result="$(update_config 2>&1)"; then
         echo "[ERROR] Could not update MCP config (left untouched):" >&2
         echo "$result" >&2
         exit 1
@@ -178,7 +199,7 @@ ensure_config() {
 
     case "$result" in
         current) ok "MCP config already up to date — not modified ($MCP_CONFIG)" ;;
-        created) ok "MCP config written to $MCP_CONFIG (--directory $CANONICAL_LINK)" ;;
+        created) ok "MCP config written to $MCP_CONFIG (--directory $RUNTIME_BRIDGE_PATH)" ;;
         updated) ok "MCP config repaired — only servers.mempalace updated ($MCP_CONFIG)" ;;
         *) warn "$result" ;;
     esac

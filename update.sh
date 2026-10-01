@@ -35,6 +35,19 @@ echo ""
 info "Ensuring canonical bridge link..."
 bash "$REPO_ROOT/scripts/link_bridge.sh"
 
+# ─── Universal runtime aliases ───────────────────────────────────────────────
+# Re-assert /opt/mempalace-mcp-bridge and /mempalace so the universal .mcp.json
+# keeps working after a repo move or a fresh machine.
+#
+# `--sudo=diagnose` is deliberate: a routine update never escalates and can never
+# stop to wait for a sudo password. If the aliases are already correct this is a
+# no-op. If root is genuinely required (fresh host, or a stale alias), update.sh
+# fails with an explicit message pointing at `bash setup.sh` — the interactive
+# installer is the place where a sudo prompt is acceptable.
+
+info "Ensuring universal runtime aliases..."
+bash "$REPO_ROOT/scripts/runtime_aliases.sh" --sudo=diagnose
+
 # ─── 1. Pull latest changes from this repo ────────────────────────────────────
 
 info "Step 1/4 — Pulling latest changes from git..."
